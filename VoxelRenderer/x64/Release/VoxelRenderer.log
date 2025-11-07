@@ -1,11 +1,12 @@
 ﻿  Application.cpp
   Chunk.cpp
   main.cpp
+  Mesher.cpp
   World.cpp
   Generating code
-  1847 of 2728 functions (67.7%) were compiled, the rest were copied from previous compilation.
-    1800 functions were new in current compilation
-    7 functions had inline decision re-evaluated but remain unchanged
+  163 of 3187 functions ( 5.1%) were compiled, the rest were copied from previous compilation.
+    109 functions were new in current compilation
+    130 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
   VoxelRenderer.vcxproj -> C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
   'pwsh.exe' is not recognized as an internal or external command,

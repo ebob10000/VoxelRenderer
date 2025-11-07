@@ -3,24 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Application.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Application.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\World.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:World.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\World.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:World.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Camera.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Camera.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Chunk.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
@@ -31,8 +15,44 @@
       "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Chunk.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\World.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:World.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\FaceData.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:FaceData.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesher.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Mesher.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Application.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Application.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\MeshItem.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:MeshItem.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\ThreadSafeQueue.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:ThreadSafeQueue.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Camera.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Camera.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesher.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Mesher.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesh.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|solutionrelative:Mesh.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{DD8E5AD5-70B6-4248-9303-40D5754A453D}|VoxelRenderer.vcxproj|C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\TerrainGenerator.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
@@ -58,7 +78,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -66,7 +86,33 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 5,
+              "Title": "Mesher.cpp",
+              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesher.cpp",
+              "RelativeDocumentMoniker": "Mesher.cpp",
+              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesher.cpp",
+              "RelativeToolTip": "Mesher.cpp",
+              "ViewState": "AgIAADwAAAAAAAAAAAAQwFUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-11-07T04:49:56.672Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "Mesh.h",
+              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesh.h",
+              "RelativeDocumentMoniker": "Mesh.h",
+              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesh.h",
+              "RelativeToolTip": "Mesh.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACwAAAACAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-11-07T04:49:32.283Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
               "Title": "TerrainGenerator.h",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\TerrainGenerator.h",
               "RelativeDocumentMoniker": "TerrainGenerator.h",
@@ -78,41 +124,42 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 6,
               "Title": "Application.cpp",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.cpp",
               "RelativeDocumentMoniker": "Application.cpp",
               "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.cpp",
               "RelativeToolTip": "Application.cpp",
-              "ViewState": "AgIAAM4AAAAAAAAAAAAYwOwAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAEgAAAAAMjMzMzMJwGsAAAAWAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-11-07T03:28:57.18Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "World.cpp",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\World.cpp",
               "RelativeDocumentMoniker": "World.cpp",
               "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\World.cpp",
               "RelativeToolTip": "World.cpp",
-              "ViewState": "AgIAADoAAAAAAAAAAAAYwF0AAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAJ8AAAAAAAAAAADwv8cAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-11-07T03:09:39.64Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 1,
               "Title": "Chunk.cpp",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Chunk.cpp",
               "RelativeDocumentMoniker": "Chunk.cpp",
               "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Chunk.cpp",
               "RelativeToolTip": "Chunk.cpp",
-              "ViewState": "AgIAADgAAAAAAAAAAAAUwGEAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACQAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-11-07T03:08:10.941Z"
+              "WhenOpened": "2025-11-07T03:08:10.941Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -122,27 +169,92 @@
               "RelativeDocumentMoniker": "World.h",
               "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\World.h",
               "RelativeToolTip": "World.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACMAAAACAAAAAAAAAA==",
+              "ViewState": "AgIAAB8AAAAAAAAAAADwv0cAAAACAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2025-11-07T03:00:37.396Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 7,
               "Title": "Application.h",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.h",
               "RelativeDocumentMoniker": "Application.h",
               "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Application.h",
               "RelativeToolTip": "Application.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAYwCsAAAACAAAAAAAAAA==",
+              "ViewState": "AgIAAAkAAACANTMzMzMCwCwAAAACAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2025-11-07T01:57:33.155Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 4,
+              "Title": "FaceData.h",
+              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\FaceData.h",
+              "RelativeDocumentMoniker": "FaceData.h",
+              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\FaceData.h",
+              "RelativeToolTip": "FaceData.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-11-07T01:46:41.814Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Chunk.h",
+              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Chunk.h",
+              "RelativeDocumentMoniker": "Chunk.h",
+              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Chunk.h",
+              "RelativeToolTip": "Chunk.h",
+              "ViewState": "AgIAABwAAACAzszMzAwswCIAAAACAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-11-07T01:46:35.585Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "Mesher.h",
+              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesher.h",
+              "RelativeDocumentMoniker": "Mesher.h",
+              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Mesher.h",
+              "RelativeToolTip": "Mesher.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAACAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-11-07T04:49:45.44Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "ThreadSafeQueue.h",
+              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\ThreadSafeQueue.h",
+              "RelativeDocumentMoniker": "ThreadSafeQueue.h",
+              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\ThreadSafeQueue.h",
+              "RelativeToolTip": "ThreadSafeQueue.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACsAAAACAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-11-07T14:07:00.963Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "MeshItem.h",
+              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\MeshItem.h",
+              "RelativeDocumentMoniker": "MeshItem.h",
+              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\MeshItem.h",
+              "RelativeToolTip": "MeshItem.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAACAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-11-07T14:07:20.833Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
               "Title": "Shader.cpp",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Shader.cpp",
               "RelativeDocumentMoniker": "Shader.cpp",
@@ -154,7 +266,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 16,
               "Title": "Shader.h",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Shader.h",
               "RelativeDocumentMoniker": "Shader.h",
@@ -166,44 +278,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "FaceData.h",
-              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\FaceData.h",
-              "RelativeDocumentMoniker": "FaceData.h",
-              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\FaceData.h",
-              "RelativeToolTip": "FaceData.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAlAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2025-11-07T01:46:41.814Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "Chunk.h",
-              "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Chunk.h",
-              "RelativeDocumentMoniker": "Chunk.h",
-              "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Chunk.h",
-              "RelativeToolTip": "Chunk.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACAAAAACAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2025-11-07T01:46:35.585Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 10,
               "Title": "Camera.h",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Camera.h",
               "RelativeDocumentMoniker": "Camera.h",
               "ToolTip": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\Camera.h",
               "RelativeToolTip": "Camera.h",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACEAAAACAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAMAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2025-11-07T01:38:49.266Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 14,
               "Title": "main.cpp",
               "DocumentMoniker": "C:\\Users\\ethan\\Documents\\Desktop\\VoxelRenderer\\main.cpp",
               "RelativeDocumentMoniker": "main.cpp",

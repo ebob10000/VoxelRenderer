@@ -70,6 +70,7 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
 }
 
 Application::~Application() {
+    m_World->stopThreads();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -159,17 +160,50 @@ void Application::render() {
 
     m_World->render(*m_WorldShader);
 
+    renderDebugOverlay();
     renderImGui();
 }
+
+void Application::renderDebugOverlay() {
+    if (!m_ShowDebugOverlay) return;
+
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+    const float PAD = 10.0f;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 work_pos = viewport->WorkPos;
+    ImVec2 window_pos;
+    window_pos.x = work_pos.x + PAD;
+    window_pos.y = work_pos.y + PAD;
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.35f);
+
+    if (ImGui::Begin("Debug Info", &m_ShowDebugOverlay, window_flags)) {
+        float fps = (m_DeltaTime > 0.0f) ? (1.0f / m_DeltaTime) : 0.0f;
+        ImGui::Text("FPS: %.1f", fps);
+        ImGui::Separator();
+        ImGui::Text("Camera Position: (%.1f, %.1f, %.1f)", m_Camera.position.x, m_Camera.position.y, m_Camera.position.z);
+        ImGui::Text("Camera Front: (%.1f, %.1f, %.1f)", m_Camera.front.x, m_Camera.front.y, m_Camera.front.z);
+        ImGui::Text("Render Distance: %d", m_World->m_RenderDistance);
+        ImGui::Text("Mesher: %s", m_World->m_UseGreedyMesher ? "Greedy" : "Simple");
+    }
+    ImGui::End();
+}
+
 
 void Application::renderImGui() {
     if (m_IsPaused) {
         ImGui::Begin("Pause Menu");
         ImGui::Text("Game is Paused");
         ImGui::Separator();
+
         if (ImGui::SliderInt("Render Distance", &m_World->m_RenderDistance, 2, 32)) {
             m_World->forceReload();
         }
+
+        if (ImGui::Checkbox("Use Greedy Meshing", &m_World->m_UseGreedyMesher)) {
+            m_World->forceReload();
+        }
+
         ImGui::Separator();
         if (ImGui::Button("Quit")) {
             glfwSetWindowShouldClose(m_Window, true);
@@ -200,6 +234,9 @@ void Application::key_callback(GLFWwindow* window, int key, int scode, int actio
     }
     if (key == GLFW_KEY_F && action == GLFW_PRESS) {
         m_WireframeMode = !m_WireframeMode;
+    }
+    if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+        m_ShowDebugOverlay = !m_ShowDebugOverlay;
     }
 }
 

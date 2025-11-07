@@ -7,5 +7,6 @@ C:\Users\ethan\Documents\Desktop\VoxelRenderer\imgui\imgui_impl_opengl3.cpp;C:\U
 C:\Users\ethan\Documents\Desktop\VoxelRenderer\imgui\imgui_tables.cpp;C:\Users\ethan\Documents\Desktop\VoxelRenderer\VoxelRenderer\x64\Release\imgui_tables.obj
 C:\Users\ethan\Documents\Desktop\VoxelRenderer\imgui\imgui_widgets.cpp;C:\Users\ethan\Documents\Desktop\VoxelRenderer\VoxelRenderer\x64\Release\imgui_widgets.obj
 C:\Users\ethan\Documents\Desktop\VoxelRenderer\main.cpp;C:\Users\ethan\Documents\Desktop\VoxelRenderer\VoxelRenderer\x64\Release\main.obj
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\Mesher.cpp;C:\Users\ethan\Documents\Desktop\VoxelRenderer\VoxelRenderer\x64\Release\Mesher.obj
 C:\Users\ethan\Documents\Desktop\VoxelRenderer\Shader.cpp;C:\Users\ethan\Documents\Desktop\VoxelRenderer\VoxelRenderer\x64\Release\Shader.obj
 C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp;C:\Users\ethan\Documents\Desktop\VoxelRenderer\VoxelRenderer\x64\Release\World.obj

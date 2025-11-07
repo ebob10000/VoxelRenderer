@@ -1,9 +1,12 @@
 #pragma once
 #include <vector>
+#include <memory>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
-#include "FaceData.h"
 
+// Forward declarations
+struct Mesh;
+class IMesher;
 class World;
 
 const int CHUNK_WIDTH = 16;
@@ -12,22 +15,21 @@ const int CHUNK_DEPTH = 16;
 
 class Chunk {
 public:
-    glm::ivec3 m_Position;
-    bool m_IsMeshed = false; // NEW
+    const glm::ivec3 m_Position;
+    std::unique_ptr<Mesh> m_Mesh;
 
     Chunk(int x, int y, int z);
-    ~Chunk();
 
-    void generateMesh(World& world);
-    void uploadMesh();
+    void createMesh(IMesher& mesher, World& world);
+
     void draw();
 
-    unsigned char getBlock(int x, int y, int z);
+    unsigned char getBlock(int x, int y, int z) const;
     void setBlock(int x, int y, int z, unsigned char blockID);
 
+    const unsigned char* getBlocks() const { return &blocks[0][0][0]; }
+    void setBlocks(const unsigned char* data);
+
 private:
-    unsigned int VAO, VBO, EBO;
-    std::vector<float> meshVertices;
-    std::vector<unsigned int> meshIndices;
     unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
 };

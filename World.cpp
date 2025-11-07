@@ -1,8 +1,33 @@
 #include "World.h"
 #include <iostream>
+#include <cstring>
 
-World::World() : m_LastPlayerChunkPos(9999) {
+World::World() : m_LastPlayerChunkPos(9999), m_IsRunning(true) {
     m_TerrainGenerator = std::make_unique<TerrainGenerator>(1337);
+    m_SimpleMesher = std::make_unique<SimpleMesher>();
+    m_GreedyMesher = std::make_unique<GreedyMesher>();
+
+    unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
+    for (unsigned int i = 0; i < num_threads; ++i) {
+        m_WorkerThreads.emplace_back(&World::workerLoop, this);
+    }
+    std::cout << "Started " << num_threads << " worker threads." << std::endl;
+}
+
+World::~World() {
+    stopThreads();
+}
+
+void World::stopThreads() {
+    if (m_IsRunning) {
+        m_IsRunning = false;
+        m_GenerationQueue.stop();
+        for (auto& thread : m_WorkerThreads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
+    }
 }
 
 void World::update(const glm::vec3& playerPosition) {
@@ -14,67 +39,144 @@ void World::update(const glm::vec3& playerPosition) {
 
     if (playerChunkPos != m_LastPlayerChunkPos) {
         loadChunks(playerChunkPos);
-        unloadChunks(playerChunkPos);
         m_LastPlayerChunkPos = playerChunkPos;
     }
+
+    buildDirtyChunks();
+    processFinishedMeshes();
 }
 
 void World::loadChunks(const glm::ivec3& playerChunkPos) {
-    std::set<glm::ivec3, ivec3_comp> chunksToRemesh;
+    std::vector<glm::ivec3> toLoad;
+    std::vector<glm::ivec3> toUnload;
 
-    for (int x = playerChunkPos.x - m_RenderDistance; x <= playerChunkPos.x + m_RenderDistance; ++x) {
-        for (int z = playerChunkPos.z - m_RenderDistance; z <= playerChunkPos.z + m_RenderDistance; ++z) {
-            glm::ivec3 chunkPos(x, 0, z);
-
-            if (m_Chunks.find(chunkPos) == m_Chunks.end()) {
-                auto newChunk = std::make_unique<Chunk>(chunkPos.x, chunkPos.y, chunkPos.z);
-                m_TerrainGenerator->generateChunkData(*newChunk);
-                m_Chunks[chunkPos] = std::move(newChunk);
-                std::cout << "Created chunk at: " << chunkPos.x << ", " << chunkPos.z << std::endl;
-
-                chunksToRemesh.insert(chunkPos);
-                chunksToRemesh.insert({ chunkPos.x + 1, 0, chunkPos.z });
-                chunksToRemesh.insert({ chunkPos.x - 1, 0, chunkPos.z });
-                chunksToRemesh.insert({ chunkPos.x, 0, chunkPos.z + 1 });
-                chunksToRemesh.insert({ chunkPos.x, 0, chunkPos.z - 1 });
+    {
+        std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
+        for (auto const& [pos, chunk] : m_Chunks) {
+            if (abs(pos.x - playerChunkPos.x) > m_RenderDistance ||
+                abs(pos.z - playerChunkPos.z) > m_RenderDistance) {
+                toUnload.push_back(pos);
             }
         }
     }
 
-    for (const auto& pos : chunksToRemesh) {
-        auto it = m_Chunks.find(pos);
-        if (it != m_Chunks.end()) {
-            it->second->generateMesh(*this);
-            it->second->uploadMesh();
+    for (int x = playerChunkPos.x - m_RenderDistance; x <= playerChunkPos.x + m_RenderDistance; ++x) {
+        for (int z = playerChunkPos.z - m_RenderDistance; z <= playerChunkPos.z + m_RenderDistance; ++z) {
+            toLoad.push_back({ x, 0, z });
+        }
+    }
+
+    {
+        std::unique_lock<std::shared_mutex> lock(m_ChunksMutex);
+        for (const auto& pos : toUnload) {
+            m_Chunks.erase(pos);
+            std::cout << "Unloaded chunk at: " << pos.x << ", " << pos.z << std::endl;
+        }
+
+        for (const auto& pos : toLoad) {
+            if (m_Chunks.find(pos) == m_Chunks.end()) {
+                auto newChunk = std::make_unique<Chunk>(pos.x, pos.y, pos.z);
+                m_TerrainGenerator->generateChunkData(*newChunk);
+                m_Chunks[pos] = std::move(newChunk);
+                std::cout << "Created chunk at: " << pos.x << ", " << pos.z << std::endl;
+
+                m_DirtyChunks.insert(pos);
+                m_DirtyChunks.insert({ pos.x + 1, 0, pos.z });
+                m_DirtyChunks.insert({ pos.x - 1, 0, pos.z });
+                m_DirtyChunks.insert({ pos.x, 0, pos.z + 1 });
+                m_DirtyChunks.insert({ pos.x, 0, pos.z - 1 });
+            }
         }
     }
 }
 
-void World::unloadChunks(const glm::ivec3& playerChunkPos) {
-    std::vector<glm::ivec3> toRemove;
-    for (auto const& [pos, chunk] : m_Chunks) {
-        if (abs(pos.x - playerChunkPos.x) > m_RenderDistance ||
-            abs(pos.z - playerChunkPos.z) > m_RenderDistance) {
-            toRemove.push_back(pos);
+void World::buildDirtyChunks() {
+    if (m_DirtyChunks.empty()) return;
+
+    for (const auto& pos : m_DirtyChunks) {
+        bool alreadyProcessing;
+        {
+            std::lock_guard<std::mutex> lock(m_MeshingJobsMutex);
+            alreadyProcessing = m_MeshingJobs.count(pos);
+        }
+
+        if (!alreadyProcessing) {
+            std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
+            auto it = m_Chunks.find(pos);
+            if (it != m_Chunks.end()) {
+                ChunkGenerationData data;
+                data.position = pos;
+                std::memcpy(data.blocks, it->second->getBlocks(), sizeof(data.blocks));
+
+                {
+                    std::lock_guard<std::mutex> jobLock(m_MeshingJobsMutex);
+                    m_MeshingJobs.insert(pos);
+                }
+                m_GenerationQueue.push(std::move(data));
+            }
         }
     }
-    for (const auto& pos : toRemove) {
-        m_Chunks.erase(pos);
-        std::cout << "Unloaded chunk at: " << pos.x << ", " << pos.z << std::endl;
+    m_DirtyChunks.clear();
+}
+
+void World::processFinishedMeshes() {
+    MeshData finishedMesh;
+    while (m_FinishedMeshesQueue.try_pop(finishedMesh)) {
+        std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
+        auto it = m_Chunks.find(finishedMesh.chunkPosition);
+        if (it != m_Chunks.end()) {
+            it->second->m_Mesh->vertices = std::move(finishedMesh.vertices);
+            it->second->m_Mesh->indices = std::move(finishedMesh.indices);
+            it->second->m_Mesh->upload();
+        }
+    }
+}
+
+void World::workerLoop() {
+    while (m_IsRunning) {
+        ChunkGenerationData data;
+        m_GenerationQueue.wait_and_pop(data);
+
+        if (!m_IsRunning) break;
+
+        Chunk tempChunk(data.position.x, data.position.y, data.position.z);
+        tempChunk.setBlocks(&data.blocks[0][0][0]);
+
+        IMesher* mesher = m_UseGreedyMesher ? (IMesher*)m_GreedyMesher.get() : (IMesher*)m_SimpleMesher.get();
+
+        Mesh tempMesh;
+        mesher->generateMesh(tempChunk, *this, tempMesh);
+
+        if (!tempMesh.vertices.empty()) {
+            MeshData meshData;
+            meshData.chunkPosition = data.position;
+            meshData.vertices = std::move(tempMesh.vertices);
+            meshData.indices = std::move(tempMesh.indices);
+            m_FinishedMeshesQueue.push(std::move(meshData));
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(m_MeshingJobsMutex);
+            m_MeshingJobs.erase(data.position);
+        }
     }
 }
 
 void World::render(Shader& shader) {
+    std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
     for (auto const& [pos, chunk] : m_Chunks) {
         chunk->draw();
     }
 }
 
-unsigned char World::getBlock(int x, int y, int z) {
+unsigned char World::getBlock(int x, int y, int z) const {
     int chunkX = static_cast<int>(floor((float)x / CHUNK_WIDTH));
     int chunkY = static_cast<int>(floor((float)y / CHUNK_HEIGHT));
     int chunkZ = static_cast<int>(floor((float)z / CHUNK_DEPTH));
+
+    std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
     auto it = m_Chunks.find({ chunkX, chunkY, chunkZ });
+
     if (it != m_Chunks.end()) {
         int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
         int localY = (y % CHUNK_HEIGHT + CHUNK_HEIGHT) % CHUNK_HEIGHT;
@@ -85,10 +187,14 @@ unsigned char World::getBlock(int x, int y, int z) {
 }
 
 size_t World::getChunkCount() const {
+    std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
     return m_Chunks.size();
 }
 
 void World::forceReload() {
-    m_Chunks.clear();
+    {
+        std::unique_lock<std::shared_mutex> lock(m_ChunksMutex);
+        m_Chunks.clear();
+    }
     m_LastPlayerChunkPos = glm::ivec3(9999);
 }
