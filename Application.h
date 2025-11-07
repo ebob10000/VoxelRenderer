@@ -9,12 +9,15 @@ struct GLFWwindow;
 class Application {
 public:
     Application();
+    ~Application();
     void run();
 
 private:
     void processInput();
     void update();
     void render();
+    void initImGui();
+    void renderImGui();
 
     GLFWwindow* m_Window;
     std::unique_ptr<Shader> m_WorldShader;

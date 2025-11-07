@@ -7,8 +7,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
+
 Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
     glfwInit();
+    const char* glsl_version = "#version 330";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -19,16 +24,21 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
 
     glfwSetWindowUserPointer(m_Window, this);
 
-    auto key_callback_lambda = [](GLFWwindow* w, int k, int s, int a, int m) { static_cast<Application*>(glfwGetWindowUserPointer(w))->key_callback(w, k, s, a, m); };
-    glfwSetKeyCallback(m_Window, key_callback_lambda);
-    auto mouse_callback_lambda = [](GLFWwindow* w, double x, double y) { static_cast<Application*>(glfwGetWindowUserPointer(w))->mouse_callback(w, x, y); };
-    glfwSetCursorPosCallback(m_Window, mouse_callback_lambda);
-    auto scroll_callback_lambda = [](GLFWwindow* w, double x, double y) { static_cast<Application*>(glfwGetWindowUserPointer(w))->scroll_callback(w, x, y); };
-    glfwSetScrollCallback(m_Window, scroll_callback_lambda);
-    auto framebuffer_size_callback_lambda = [](GLFWwindow* w, int width, int height) { static_cast<Application*>(glfwGetWindowUserPointer(w))->framebuffer_size_callback(w, width, height); };
-    glfwSetFramebufferSizeCallback(m_Window, framebuffer_size_callback_lambda);
+    glfwSetKeyCallback(m_Window, [](GLFWwindow* w, int k, int s, int a, int m) {
+        static_cast<Application*>(glfwGetWindowUserPointer(w))->key_callback(w, k, s, a, m);
+        });
+    glfwSetCursorPosCallback(m_Window, [](GLFWwindow* w, double x, double y) {
+        static_cast<Application*>(glfwGetWindowUserPointer(w))->mouse_callback(w, x, y);
+        });
+    glfwSetScrollCallback(m_Window, [](GLFWwindow* w, double x, double y) {
+        static_cast<Application*>(glfwGetWindowUserPointer(w))->scroll_callback(w, x, y);
+        });
+    glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* w, int width, int height) {
+        static_cast<Application*>(glfwGetWindowUserPointer(w))->framebuffer_size_callback(w, width, height);
+        });
 
-    glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    initImGui();
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
@@ -57,17 +67,21 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
     stbi_image_free(data);
 
     m_World = std::make_unique<World>();
+}
 
-    float uiVertices[] = { -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f, -1.0f };
-    unsigned int uiVBO;
-    glGenVertexArrays(1, &m_UiVAO);
-    glGenBuffers(1, &uiVBO);
-    glBindVertexArray(m_UiVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, uiVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(uiVertices), &uiVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glBindVertexArray(0);
+Application::~Application() {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+}
+
+void Application::initImGui() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(m_Window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 }
 
 void Application::run() {
@@ -77,9 +91,15 @@ void Application::run() {
         float currentFrame = (float)glfwGetTime();
         m_DeltaTime = currentFrame - m_LastFrame;
         m_LastFrame = currentFrame;
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
         processInput();
         update();
         render();
+
         double currentTime = glfwGetTime();
         frameCount++;
         if (currentTime - lastTime >= 1.0) {
@@ -100,6 +120,10 @@ void Application::processInput() {
     if (glfwGetKey(m_Window, GLFW_KEY_Q) == GLFW_PRESS) {
         glfwSetWindowShouldClose(m_Window, true);
     }
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureKeyboard) return;
+
     if (m_IsPaused) return;
     const float cameraSpeed = m_Camera.speed * m_DeltaTime;
     if (glfwGetKey(m_Window, GLFW_KEY_W) == GLFW_PRESS) m_Camera.position += cameraSpeed * m_Camera.front;
@@ -126,34 +150,49 @@ void Application::render() {
     m_WorldShader->use();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_TextureID);
-    
-    // --- CRITICAL CHANGE: Increased far clipping plane ---
-    glm::mat4 projection = glm::perspective(glm::radians(m_Camera.fov), 1280.0f / 720.0f, 0.1f, 1000.0f); // Far plane is now 1000.0f
-    
+
+    glm::mat4 projection = glm::perspective(glm::radians(m_Camera.fov), 1280.0f / 720.0f, 0.1f, 1000.0f);
     glm::mat4 view = m_Camera.getViewMatrix();
     m_WorldShader->setMat4("projection", projection);
     m_WorldShader->setMat4("view", view);
     m_WorldShader->setMat4("model", glm::mat4(1.0f));
-    
+
     m_World->render(*m_WorldShader);
 
+    renderImGui();
+}
+
+void Application::renderImGui() {
     if (m_IsPaused) {
-        glDisable(GL_DEPTH_TEST);
-        m_UiShader->use();
-        glBindVertexArray(m_UiVAO);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glEnable(GL_DEPTH_TEST);
+        ImGui::Begin("Pause Menu");
+        ImGui::Text("Game is Paused");
+        ImGui::Separator();
+        if (ImGui::SliderInt("Render Distance", &m_World->m_RenderDistance, 2, 32)) {
+            m_World->forceReload();
+        }
+        ImGui::Separator();
+        if (ImGui::Button("Quit")) {
+            glfwSetWindowShouldClose(m_Window, true);
+        }
+        ImGui::End();
     }
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void Application::framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void Application::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void Application::key_callback(GLFWwindow* window, int key, int scode, int action, int mods) {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureKeyboard) return;
+
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         m_IsPaused = !m_IsPaused;
-        if (m_IsPaused) glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        if (m_IsPaused) {
+            glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
         else {
             glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             m_FirstMouse = true;
@@ -165,6 +204,9 @@ void Application::key_callback(GLFWwindow* window, int key, int scancode, int ac
 }
 
 void Application::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;
+
     if (m_IsPaused) return;
     if (m_FirstMouse) {
         m_LastMouseX = xpos;
@@ -185,17 +227,11 @@ void Application::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 void Application::scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    // Increase speed exponentially for a better feel
-    float speedMultiplier = 1.1f;
-    if (yoffset > 0) {
-        m_Camera.speed *= speedMultiplier;
-    }
-    else {
-        m_Camera.speed /= speedMultiplier;
-    }
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;
 
-    // Keep a minimum speed
-    if (m_Camera.speed < 0.1f) {
-        m_Camera.speed = 0.1f;
-    }
+    float speedMultiplier = 1.1f;
+    if (yoffset > 0) m_Camera.speed *= speedMultiplier;
+    else m_Camera.speed /= speedMultiplier;
+    if (m_Camera.speed < 0.1f) m_Camera.speed = 0.1f;
 }

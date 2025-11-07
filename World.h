@@ -17,15 +17,14 @@ struct ivec3_comp {
 
 class World {
 public:
+    int m_RenderDistance = 8;
+
     World();
-
-    // The main update function, called every frame
     void update(const glm::vec3& playerPosition);
-
     void render(Shader& shader);
     unsigned char getBlock(int x, int y, int z);
-
     size_t getChunkCount() const;
+    void forceReload();
 
 private:
     void loadChunks(const glm::ivec3& playerChunkPos);
@@ -33,7 +32,5 @@ private:
 
     std::map<glm::ivec3, std::unique_ptr<Chunk>, ivec3_comp> m_Chunks;
     std::unique_ptr<TerrainGenerator> m_TerrainGenerator;
-
     glm::ivec3 m_LastPlayerChunkPos;
-    int m_RenderDistance = 8;
 };
