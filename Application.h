@@ -1,10 +1,9 @@
 #pragma once
 #include "Camera.h"
-#include "Chunk.h"
+#include "World.h"
 #include "Shader.h"
 #include <memory>
 
-// Forward declare GLFWwindow
 struct GLFWwindow;
 
 class Application {
@@ -17,11 +16,10 @@ private:
     void update();
     void render();
 
-    // Member variables - NO globals
     GLFWwindow* m_Window;
     std::unique_ptr<Shader> m_WorldShader;
     std::unique_ptr<Shader> m_UiShader;
-    std::unique_ptr<Chunk> m_Chunk;
+    std::unique_ptr<World> m_World;
     Camera m_Camera;
 
     bool m_IsPaused = false;
@@ -39,5 +37,5 @@ private:
     void framebuffer_size_callback(GLFWwindow* window, int width, int height);
     void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-    void scroll_callback(GLFWwindow* window, double xoffset, double yoffset); // Typo fixed, correct arguments
+    void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 };

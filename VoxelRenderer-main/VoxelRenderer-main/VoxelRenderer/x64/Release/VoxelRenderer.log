@@ -1,0 +1,12 @@
+﻿  Application.cpp
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\Application.cpp(192,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\Application.cpp(193,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+  Generating code
+  21 of 584 functions ( 3.6%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    3 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  VoxelRenderer.vcxproj -> C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
+  'pwsh.exe' is not recognized as an internal or external command,
+  operable program or batch file.
+          1 file(s) copied.
