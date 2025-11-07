@@ -11,4 +11,5 @@ public:
 
     void use();
     void setMat4(const std::string& name, const glm::mat4& mat) const;
+    void setBool(const std::string& name, bool value) const;
 };

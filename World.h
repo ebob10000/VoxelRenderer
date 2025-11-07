@@ -27,7 +27,6 @@ struct MeshData {
     std::vector<unsigned int> indices;
 };
 
-// Data required by a worker to generate a mesh without accessing a live chunk
 struct ChunkGenerationData {
     glm::ivec3 position;
     unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH];
@@ -37,12 +36,15 @@ class World {
 public:
     int m_RenderDistance = 8;
     bool m_UseGreedyMesher = false;
+    bool m_UseAO = true;
+    bool m_UseSunlight = true;
 
     World();
     ~World();
     void update(const glm::vec3& playerPosition);
     void render(Shader& shader);
     unsigned char getBlock(int x, int y, int z) const;
+    unsigned char getLight(int x, int y, int z) const;
     size_t getChunkCount() const;
     void forceReload();
     void stopThreads();
@@ -52,6 +54,7 @@ private:
     void buildDirtyChunks();
     void processFinishedMeshes();
     void workerLoop();
+    void calculateSunlight(Chunk& chunk);
 
     std::map<glm::ivec3, std::unique_ptr<Chunk>, ivec3_comp> m_Chunks;
     std::unique_ptr<TerrainGenerator> m_TerrainGenerator;

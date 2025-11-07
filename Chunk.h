@@ -17,6 +17,7 @@ class Chunk {
 public:
     const glm::ivec3 m_Position;
     std::unique_ptr<Mesh> m_Mesh;
+    unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
 
     Chunk(int x, int y, int z);
 
@@ -30,6 +31,9 @@ public:
     const unsigned char* getBlocks() const { return &blocks[0][0][0]; }
     void setBlocks(const unsigned char* data);
 
+    unsigned char getLight(int x, int y, int z) const;
+    void setLight(int x, int y, int z, unsigned char lightLevel);
+
 private:
-    unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
+    unsigned char lightLevels[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
 };

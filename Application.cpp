@@ -149,6 +149,9 @@ void Application::render() {
     else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     m_WorldShader->use();
+    m_WorldShader->setBool("u_UseAO", m_World->m_UseAO);
+    m_WorldShader->setBool("u_UseSunlight", m_World->m_UseSunlight);
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
@@ -189,7 +192,6 @@ void Application::renderDebugOverlay() {
     ImGui::End();
 }
 
-
 void Application::renderImGui() {
     if (m_IsPaused) {
         ImGui::Begin("Pause Menu");
@@ -201,6 +203,14 @@ void Application::renderImGui() {
         }
 
         if (ImGui::Checkbox("Use Greedy Meshing", &m_World->m_UseGreedyMesher)) {
+            m_World->forceReload();
+        }
+
+        if (ImGui::Checkbox("Ambient Occlusion", &m_World->m_UseAO)) {
+            m_World->forceReload();
+        }
+
+        if (ImGui::Checkbox("Sunlight", &m_World->m_UseSunlight)) {
             m_World->forceReload();
         }
 

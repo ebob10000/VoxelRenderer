@@ -35,3 +35,17 @@ void Chunk::setBlock(int x, int y, int z, unsigned char blockID) {
 void Chunk::setBlocks(const unsigned char* data) {
     std::memcpy(blocks, data, sizeof(blocks));
 }
+
+unsigned char Chunk::getLight(int x, int y, int z) const {
+    if (x < 0 || x >= CHUNK_WIDTH || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_DEPTH) {
+        return 15; // Assume fully lit outside chunk
+    }
+    return lightLevels[x][y][z];
+}
+
+void Chunk::setLight(int x, int y, int z, unsigned char lightLevel) {
+    if (x < 0 || x >= CHUNK_WIDTH || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_DEPTH) {
+        return;
+    }
+    lightLevels[x][y][z] = lightLevel;
+}

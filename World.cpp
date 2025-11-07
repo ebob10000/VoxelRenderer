@@ -46,6 +46,20 @@ void World::update(const glm::vec3& playerPosition) {
     processFinishedMeshes();
 }
 
+void World::calculateSunlight(Chunk& chunk) {
+    for (int x = 0; x < CHUNK_WIDTH; ++x) {
+        for (int z = 0; z < CHUNK_DEPTH; ++z) {
+            unsigned char lightLevel = 15;
+            for (int y = CHUNK_HEIGHT - 1; y >= 0; --y) {
+                if (chunk.getBlock(x, y, z) != 0) {
+                    lightLevel = 0;
+                }
+                chunk.setLight(x, y, z, lightLevel);
+            }
+        }
+    }
+}
+
 void World::loadChunks(const glm::ivec3& playerChunkPos) {
     std::vector<glm::ivec3> toLoad;
     std::vector<glm::ivec3> toUnload;
@@ -70,15 +84,16 @@ void World::loadChunks(const glm::ivec3& playerChunkPos) {
         std::unique_lock<std::shared_mutex> lock(m_ChunksMutex);
         for (const auto& pos : toUnload) {
             m_Chunks.erase(pos);
-            std::cout << "Unloaded chunk at: " << pos.x << ", " << pos.z << std::endl;
+            // std::cout << "Unloaded chunk at: " << pos.x << ", " << pos.z << std::endl;
         }
 
         for (const auto& pos : toLoad) {
             if (m_Chunks.find(pos) == m_Chunks.end()) {
                 auto newChunk = std::make_unique<Chunk>(pos.x, pos.y, pos.z);
                 m_TerrainGenerator->generateChunkData(*newChunk);
+                calculateSunlight(*newChunk);
                 m_Chunks[pos] = std::move(newChunk);
-                std::cout << "Created chunk at: " << pos.x << ", " << pos.z << std::endl;
+                // std::cout << "Created chunk at: " << pos.x << ", " << pos.z << std::endl;
 
                 m_DirtyChunks.insert(pos);
                 m_DirtyChunks.insert({ pos.x + 1, 0, pos.z });
@@ -141,6 +156,7 @@ void World::workerLoop() {
 
         Chunk tempChunk(data.position.x, data.position.y, data.position.z);
         tempChunk.setBlocks(&data.blocks[0][0][0]);
+        calculateSunlight(tempChunk); // Recalculate light for the copied data
 
         IMesher* mesher = m_UseGreedyMesher ? (IMesher*)m_GreedyMesher.get() : (IMesher*)m_SimpleMesher.get();
 
@@ -185,6 +201,24 @@ unsigned char World::getBlock(int x, int y, int z) const {
     }
     return 0;
 }
+
+unsigned char World::getLight(int x, int y, int z) const {
+    int chunkX = static_cast<int>(floor((float)x / CHUNK_WIDTH));
+    int chunkY = static_cast<int>(floor((float)y / CHUNK_HEIGHT));
+    int chunkZ = static_cast<int>(floor((float)z / CHUNK_DEPTH));
+
+    std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
+    auto it = m_Chunks.find({ chunkX, chunkY, chunkZ });
+
+    if (it != m_Chunks.end()) {
+        int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
+        int localY = (y % CHUNK_HEIGHT + CHUNK_HEIGHT) % CHUNK_HEIGHT;
+        int localZ = (z % CHUNK_DEPTH + CHUNK_DEPTH) % CHUNK_DEPTH;
+        return it->second->getLight(localX, localY, localZ);
+    }
+    return 15;
+}
+
 
 size_t World::getChunkCount() const {
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
