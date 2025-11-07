@@ -14,6 +14,7 @@ public:
     float pitch = 0.0f;
     float speed = 5.0f;
     float sensitivity = 0.1f;
+    float fov = 75.0f;
 
     Camera(glm::vec3 startPosition)
         : position(startPosition), front(glm::vec3(0.0f, 0.0f, -1.0f)), up(glm::vec3(0.0f, 1.0f, 0.0f)) {

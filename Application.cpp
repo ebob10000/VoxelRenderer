@@ -7,8 +7,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-Application::Application() : m_Camera(glm::vec3(8.0f, 15.0f, 45.0f)) {
-    // Standard setup... (all unchanged)
+Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -17,7 +16,9 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 15.0f, 45.0f)) {
     glfwMakeContextCurrent(m_Window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glfwSwapInterval(0);
+
     glfwSetWindowUserPointer(m_Window, this);
+
     auto key_callback_lambda = [](GLFWwindow* w, int k, int s, int a, int m) { static_cast<Application*>(glfwGetWindowUserPointer(w))->key_callback(w, k, s, a, m); };
     glfwSetKeyCallback(m_Window, key_callback_lambda);
     auto mouse_callback_lambda = [](GLFWwindow* w, double x, double y) { static_cast<Application*>(glfwGetWindowUserPointer(w))->mouse_callback(w, x, y); };
@@ -26,19 +27,23 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 15.0f, 45.0f)) {
     glfwSetScrollCallback(m_Window, scroll_callback_lambda);
     auto framebuffer_size_callback_lambda = [](GLFWwindow* w, int width, int height) { static_cast<Application*>(glfwGetWindowUserPointer(w))->framebuffer_size_callback(w, width, height); };
     glfwSetFramebufferSizeCallback(m_Window, framebuffer_size_callback_lambda);
+
     glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     m_WorldShader = std::make_unique<Shader>("shaders/world.vert", "shaders/world.frag");
     m_UiShader = std::make_unique<Shader>("shaders/ui.vert", "shaders/ui.frag");
+
     glGenTextures(1, &m_TextureID);
     glBindTexture(GL_TEXTURE_2D, m_TextureID);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
     unsigned char* data = stbi_load("textures/stone.png", &width, &height, &nrChannels, 3);
@@ -46,20 +51,13 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 15.0f, 45.0f)) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
-    else { std::cout << "Failed to load texture" << std::endl; }
+    else {
+        std::cout << "Failed to load texture" << std::endl;
+    }
     stbi_image_free(data);
 
-    // --- NEW ORDER OF OPERATIONS ---
     m_World = std::make_unique<World>();
-    // 1. Add all chunks to the world map
-    m_World->addChunk(0, 0, 0);
-    m_World->addChunk(1, 0, 0);
-    m_World->addChunk(0, 0, 1);
-    m_World->addChunk(-1, 0, 0);
-    // 2. NOW, build all the meshes
-    m_World->buildMeshes();
 
-    // UI setup... (unchanged)
     float uiVertices[] = { -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f, -1.0f };
     unsigned int uiVBO;
     glGenVertexArrays(1, &m_UiVAO);
@@ -71,9 +69,6 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 15.0f, 45.0f)) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glBindVertexArray(0);
 }
-
-// ... the rest of the file (run, render, processInput, etc.) is exactly the same ...
-// I am including it in full to prevent any more errors.
 
 void Application::run() {
     double lastTime = glfwGetTime();
@@ -90,7 +85,7 @@ void Application::run() {
         if (currentTime - lastTime >= 1.0) {
             char title[256];
             double fps = frameCount > 0 ? (double)frameCount / (currentTime - lastTime) : 0.0;
-            sprintf_s(title, sizeof(title), "Voxel Engine | FPS: %.0f | Frame Time: %.2f ms", fps, 1000.0 / fps);
+            sprintf_s(title, sizeof(title), "Voxel Engine | FPS: %.0f | Chunks: %llu", fps, (unsigned long long)m_World->getChunkCount());
             glfwSetWindowTitle(m_Window, title);
             frameCount = 0;
             lastTime = currentTime;
@@ -115,22 +110,33 @@ void Application::processInput() {
     if (glfwGetKey(m_Window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) m_Camera.position -= cameraSpeed * m_Camera.up;
 }
 
-void Application::update() {}
+void Application::update() {
+    if (!m_IsPaused) {
+        m_World->update(m_Camera.position);
+    }
+}
 
 void Application::render() {
     glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     if (m_WireframeMode) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
     m_WorldShader->use();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_TextureID);
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 100.0f);
+    
+    // --- CRITICAL CHANGE: Increased far clipping plane ---
+    glm::mat4 projection = glm::perspective(glm::radians(m_Camera.fov), 1280.0f / 720.0f, 0.1f, 1000.0f); // Far plane is now 1000.0f
+    
     glm::mat4 view = m_Camera.getViewMatrix();
     m_WorldShader->setMat4("projection", projection);
     m_WorldShader->setMat4("view", view);
     m_WorldShader->setMat4("model", glm::mat4(1.0f));
+    
     m_World->render(*m_WorldShader);
+
     if (m_IsPaused) {
         glDisable(GL_DEPTH_TEST);
         m_UiShader->use();
@@ -179,7 +185,17 @@ void Application::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 void Application::scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    m_Camera.speed += (float)yoffset;
-    if (m_Camera.speed < 1.0f) m_Camera.speed = 1.0f;
-    if (m_Camera.speed > 45.0f) m_Camera.speed = 45.0f;
+    // Increase speed exponentially for a better feel
+    float speedMultiplier = 1.1f;
+    if (yoffset > 0) {
+        m_Camera.speed *= speedMultiplier;
+    }
+    else {
+        m_Camera.speed /= speedMultiplier;
+    }
+
+    // Keep a minimum speed
+    if (m_Camera.speed < 0.1f) {
+        m_Camera.speed = 0.1f;
+    }
 }

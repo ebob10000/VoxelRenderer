@@ -146,8 +146,10 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Chunk.h" />
     <ClInclude Include="FaceData.h" />
+    <ClInclude Include="FastNoiseLite.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="TerrainGenerator.h" />
     <ClInclude Include="World.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,14 +1,9 @@
 ﻿  Application.cpp
-  Chunk.cpp
-  World.cpp
-C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(32,16): warning C4244: 'initializing': conversion from 'float' to 'int', possible loss of data
-C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(33,16): warning C4244: 'initializing': conversion from 'float' to 'int', possible loss of data
-C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(34,16): warning C4244: 'initializing': conversion from 'float' to 'int', possible loss of data
   main.cpp
   Generating code
-  17 of 718 functions ( 2.4%) were compiled, the rest were copied from previous compilation.
-    1 functions were new in current compilation
-    9 functions had inline decision re-evaluated but remain unchanged
+  17 of 929 functions ( 1.8%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    7 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
   VoxelRenderer.vcxproj -> C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
   'pwsh.exe' is not recognized as an internal or external command,
