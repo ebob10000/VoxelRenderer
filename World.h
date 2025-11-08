@@ -11,7 +11,7 @@
 #include "Chunk.h"
 #include "TerrainGenerator.h"
 #include "ThreadSafeQueue.h"
-#include "Mesher.h" // <<< THE FIX IS HERE
+#include "Mesher.h"
 
 struct ivec3_comp {
     bool operator()(const glm::ivec3& a, const glm::ivec3& b) const {
@@ -31,14 +31,14 @@ struct ChunkGenerationData {
     glm::ivec3 position;
 };
 
-// Forward declare to allow friendship
 class ChunkMeshingData;
+class Frustum;
 
 class World {
-    friend class ChunkMeshingData; // Grant the data provider access to private members
+    friend class ChunkMeshingData;
 
 public:
-    int m_RenderDistance = 8;
+    int m_RenderDistance = 12;
     bool m_UseGreedyMesher = false;
     bool m_UseAO = true;
     bool m_UseSunlight = true;
@@ -46,7 +46,7 @@ public:
     World();
     ~World();
     void update(const glm::vec3& playerPosition);
-    void render(Shader& shader);
+    int render(Shader& shader, const Frustum& frustum);
     unsigned char getBlock(int x, int y, int z) const;
     unsigned char getLight(int x, int y, int z) const;
     size_t getChunkCount() const;
@@ -60,7 +60,7 @@ private:
     void workerLoop();
     void calculateSunlight(Chunk& chunk);
 
-    std::map<glm::ivec3, std::unique_ptr<Chunk>, ivec3_comp> m_Chunks;
+    std::map<glm::ivec3, std::shared_ptr<Chunk>, ivec3_comp> m_Chunks; 
     std::unique_ptr<TerrainGenerator> m_TerrainGenerator;
     std::unique_ptr<SimpleMesher> m_SimpleMesher;
     std::unique_ptr<GreedyMesher> m_GreedyMesher;

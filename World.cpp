@@ -1,5 +1,6 @@
 #include "World.h"
 #include "Mesher.h"
+#include "Frustum.h"
 #include <iostream>
 #include <cstring>
 
@@ -89,7 +90,7 @@ void World::loadChunks(const glm::ivec3& playerChunkPos) {
 
         for (const auto& pos : toLoad) {
             if (m_Chunks.find(pos) == m_Chunks.end()) {
-                auto newChunk = std::make_unique<Chunk>(pos.x, pos.y, pos.z);
+                auto newChunk = std::make_shared<Chunk>(pos.x, pos.y, pos.z);
                 m_TerrainGenerator->generateChunkData(*newChunk);
                 calculateSunlight(*newChunk);
                 m_Chunks[pos] = std::move(newChunk);
@@ -120,7 +121,6 @@ void World::buildDirtyChunks() {
             if (it != m_Chunks.end()) {
                 ChunkGenerationData data;
                 data.position = pos;
-                // We no longer need to copy data here, the provider will access it.
 
                 {
                     std::lock_guard<std::mutex> jobLock(m_MeshingJobsMutex);
@@ -177,11 +177,19 @@ void World::workerLoop() {
     }
 }
 
-void World::render(Shader& shader) {
+int World::render(Shader& shader, const Frustum& frustum) {
+    int chunksRendered = 0;
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
     for (auto const& [pos, chunk] : m_Chunks) {
-        chunk->draw();
+        glm::vec3 min(pos.x * CHUNK_WIDTH, pos.y * CHUNK_HEIGHT, pos.z * CHUNK_DEPTH);
+        glm::vec3 max = min + glm::vec3(CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_DEPTH);
+
+        if (frustum.isBoxInFrustum(min, max)) {
+            chunk->draw();
+            chunksRendered++;
+        }
     }
+    return chunksRendered;
 }
 
 unsigned char World::getBlock(int x, int y, int z) const {

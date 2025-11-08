@@ -7,7 +7,7 @@
 struct Mesh;
 
 const int CHUNK_WIDTH = 16;
-const int CHUNK_HEIGHT = 16;
+const int CHUNK_HEIGHT = 64;
 const int CHUNK_DEPTH = 16;
 
 class Chunk {

@@ -1,30 +1,34 @@
 #version 330 core
 out vec4 FragColor;
 
-in vec2 TexCoord;
-in float vOcclusion;
-in float vLight;
+in vec2 TexCoords;
+in float AO;
+in float Light;
 
-uniform sampler2D ourTexture;
+uniform sampler2D u_Texture;
 uniform bool u_UseAO;
 uniform bool u_UseSunlight;
 
 void main()
 {
-    vec4 texColor = texture(ourTexture, TexCoord);
+    vec4 texColor = texture(u_Texture, TexCoords);
 
-    float brightness = 1.0;
+    // Don't render transparent pixels
+    if(texColor.a < 0.1)
+        discard;
 
-    if (u_UseSunlight) {
-        brightness *= (vLight / 15.0);
+    float aoFactor = 1.0;
+    if (u_UseAO) {
+        // Higher AO value means more darkness. Adjust the 0.25 to control strength.
+        aoFactor = 1.0 - AO * 0.25;
     }
 
-    if (u_UseAO) {
-        float ao_factor = 1.0 - vOcclusion * 0.2;
-        brightness *= ao_factor;
+    float lightFactor = 1.0;
+    if (u_UseSunlight) {
+        // Map light level from [0, 15] to a brightness multiplier.
+        lightFactor = Light / 15.0;
     }
     
-    brightness = max(brightness, 0.15); 
-
-    FragColor = vec4(texColor.rgb * brightness, texColor.a);
+    // THE FIX IS HERE: Only modify the .rgb channels, preserve the original .a
+    FragColor = vec4(texColor.rgb * aoFactor * lightFactor, texColor.a);
 }

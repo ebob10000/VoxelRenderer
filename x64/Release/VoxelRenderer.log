@@ -1,0 +1,11 @@
+﻿  Application.cpp
+  main.cpp
+  Generating code
+  6 of 3395 functions ( 0.2%) were compiled, the rest were copied from previous compilation.
+    4 functions were new in current compilation
+    45 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  VoxelRenderer.vcxproj -> C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
+  'pwsh.exe' is not recognized as an internal or external command,
+  operable program or batch file.
+          1 file(s) copied.

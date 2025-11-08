@@ -1,0 +1,3 @@
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRen.C6C006E4.Up2Date
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\glfw3.dll

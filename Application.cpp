@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "Frustum.h"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <string>
@@ -37,6 +38,10 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
         static_cast<Application*>(glfwGetWindowUserPointer(w))->framebuffer_size_callback(w, width, height);
         });
 
+    glfwSetWindowFocusCallback(m_Window, [](GLFWwindow* w, int f) {
+        static_cast<Application*>(glfwGetWindowUserPointer(w))->window_focus_callback(w, f);
+        });
+
     initImGui();
 
     glEnable(GL_DEPTH_TEST);
@@ -48,15 +53,20 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
     m_UiShader = std::make_unique<Shader>("shaders/ui.vert", "shaders/ui.frag");
 
     glGenTextures(1, &m_TextureID);
-    glBindTexture(GL_TEXTURE_2D, m_TextureID);
+    glBindTexture(GL_TEXTURE_2D, m_TextureID); // Bind the texture
+
+    // Set all texture parameters while it is bound
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+    // Load pixel data from file
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load("textures/stone.png", &width, &height, &nrChannels, 3);
+    unsigned char* data = stbi_load("textures/atlas.png", &width, &height, &nrChannels, 3);
+
+    // Upload the data to the GPU and generate mipmaps
     if (data) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -65,6 +75,10 @@ Application::Application() : m_Camera(glm::vec3(8.0f, 25.0f, 8.0f)) {
         std::cout << "Failed to load texture" << std::endl;
     }
     stbi_image_free(data);
+
+    // NOW that the texture is fully created, apply the mipmap level setting.
+    // This function will bind and unbind the texture itself.
+    applyTextureSettings();
 
     m_World = std::make_unique<World>();
 }
@@ -161,7 +175,8 @@ void Application::render() {
     m_WorldShader->setMat4("view", view);
     m_WorldShader->setMat4("model", glm::mat4(1.0f));
 
-    m_World->render(*m_WorldShader);
+    m_Frustum.update(projection * view);
+    m_RenderedChunks = m_World->render(*m_WorldShader, m_Frustum);
 
     renderDebugOverlay();
     renderImGui();
@@ -187,6 +202,7 @@ void Application::renderDebugOverlay() {
         ImGui::Text("Camera Position: (%.1f, %.1f, %.1f)", m_Camera.position.x, m_Camera.position.y, m_Camera.position.z);
         ImGui::Text("Camera Front: (%.1f, %.1f, %.1f)", m_Camera.front.x, m_Camera.front.y, m_Camera.front.z);
         ImGui::Text("Render Distance: %d", m_World->m_RenderDistance);
+        ImGui::Text("Chunks Rendered: %d / %llu", m_RenderedChunks, m_World->getChunkCount());
         ImGui::Text("Mesher: %s", m_World->m_UseGreedyMesher ? "Greedy" : "Simple");
     }
     ImGui::End();
@@ -212,6 +228,11 @@ void Application::renderImGui() {
 
         if (ImGui::Checkbox("Sunlight", &m_World->m_UseSunlight)) {
             m_World->forceReload();
+        }
+
+        // THE FIX: Add the mipmap slider
+        if (ImGui::SliderInt("Mipmap Level", &m_MipmapLevel, 0, 4)) {
+            applyTextureSettings();
         }
 
         ImGui::Separator();
@@ -281,4 +302,18 @@ void Application::scroll_callback(GLFWwindow* window, double xoffset, double yof
     if (yoffset > 0) m_Camera.speed *= speedMultiplier;
     else m_Camera.speed /= speedMultiplier;
     if (m_Camera.speed < 0.1f) m_Camera.speed = 0.1f;
+}
+
+void Application::applyTextureSettings() {
+    glBindTexture(GL_TEXTURE_2D, m_TextureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, m_MipmapLevel);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Application::window_focus_callback(GLFWwindow* window, int focused)
+{
+    if (focused)
+    {
+        m_FirstMouse = true;
+    }
 }

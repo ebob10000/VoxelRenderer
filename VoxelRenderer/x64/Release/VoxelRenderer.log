@@ -1,13 +1,12 @@
 ﻿  Application.cpp
+  Chunk.cpp
+  ChunkColumn.cpp
   main.cpp
   Mesher.cpp
   World.cpp
-  Generating code
-  166 of 3234 functions ( 5.1%) were compiled, the rest were copied from previous compilation.
-    17 functions were new in current compilation
-    104 functions had inline decision re-evaluated but remain unchanged
-  Finished generating code
-  VoxelRenderer.vcxproj -> C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
-  'pwsh.exe' is not recognized as an internal or external command,
-  operable program or batch file.
-          1 file(s) copied.
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(182,5): error C2059: syntax error: '}'
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(182,5): error C2143: syntax error: missing ';' before '}'
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(183,1): error C2143: syntax error: missing ';' before '}'
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(183,1): error C2059: syntax error: '}'
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(185,36): error C2143: syntax error: missing ';' before '{'
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\World.cpp(185,36): error C2447: '{': missing function header (old-style formal list?)
