@@ -9,9 +9,9 @@
 #include <glm/glm.hpp>
 #include "Shader.h"
 #include "Chunk.h"
-#include "Mesher.h"
 #include "TerrainGenerator.h"
 #include "ThreadSafeQueue.h"
+#include "Mesher.h" // <<< THE FIX IS HERE
 
 struct ivec3_comp {
     bool operator()(const glm::ivec3& a, const glm::ivec3& b) const {
@@ -29,10 +29,14 @@ struct MeshData {
 
 struct ChunkGenerationData {
     glm::ivec3 position;
-    unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH];
 };
 
+// Forward declare to allow friendship
+class ChunkMeshingData;
+
 class World {
+    friend class ChunkMeshingData; // Grant the data provider access to private members
+
 public:
     int m_RenderDistance = 8;
     bool m_UseGreedyMesher = false;

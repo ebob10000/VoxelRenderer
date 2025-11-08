@@ -1,26 +1,35 @@
 #pragma once
-#include "Chunk.h"
 #include "Mesh.h"
+#include <array>
+#include <glm/glm.hpp>
 
-// Forward declare to avoid circular dependencies
-class World;
 class Chunk;
-struct Mesh;
+class World;
 
-// The interface for all meshing algorithms
+// Provides a fast, lock-free view of a 3x3x1 area of chunks for a meshing job.
+class ChunkMeshingData {
+public:
+    ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos);
+    unsigned char getBlock(int x, int y, int z) const;
+    unsigned char getLight(int x, int y, int z) const;
+
+private:
+    // A 3x3 grid of chunk pointers centered on the chunk to be meshed
+    std::array<const Chunk*, 9> m_ChunkNeighbors{};
+};
+
 class IMesher {
 public:
-    virtual void generateMesh(Chunk& chunk, World& world, Mesh& mesh) = 0;
+    // The mesher now only needs the local data provider to do its job.
+    virtual void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) = 0;
 };
 
-// --- Implementation for the Simple Mesher ---
 class SimpleMesher : public IMesher {
 public:
-    void generateMesh(Chunk& chunk, World& world, Mesh& mesh) override;
+    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) override;
 };
 
-// --- Implementation for the Greedy Mesher ---
 class GreedyMesher : public IMesher {
 public:
-    void generateMesh(Chunk& chunk, World& world, Mesh& mesh) override;
+    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) override;
 };

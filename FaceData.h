@@ -48,7 +48,6 @@ const int faceNormals[6][3] = {
     {0, 0, -1}, {0, 0, 1}
 };
 
-// CORRECTED Ambient Occlusion checker table.
 // For each face (6), for each vertex of that face (4), for each neighbor to check (3: side1, side2, corner), provides the (x,y,z) offset.
 const int aoCheck[6][4][3][3] = {
     // -X Face (Normal -1, 0, 0)

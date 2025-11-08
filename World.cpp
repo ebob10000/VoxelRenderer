@@ -1,4 +1,5 @@
 #include "World.h"
+#include "Mesher.h"
 #include <iostream>
 #include <cstring>
 
@@ -84,7 +85,6 @@ void World::loadChunks(const glm::ivec3& playerChunkPos) {
         std::unique_lock<std::shared_mutex> lock(m_ChunksMutex);
         for (const auto& pos : toUnload) {
             m_Chunks.erase(pos);
-            // std::cout << "Unloaded chunk at: " << pos.x << ", " << pos.z << std::endl;
         }
 
         for (const auto& pos : toLoad) {
@@ -93,7 +93,6 @@ void World::loadChunks(const glm::ivec3& playerChunkPos) {
                 m_TerrainGenerator->generateChunkData(*newChunk);
                 calculateSunlight(*newChunk);
                 m_Chunks[pos] = std::move(newChunk);
-                // std::cout << "Created chunk at: " << pos.x << ", " << pos.z << std::endl;
 
                 m_DirtyChunks.insert(pos);
                 m_DirtyChunks.insert({ pos.x + 1, 0, pos.z });
@@ -121,7 +120,7 @@ void World::buildDirtyChunks() {
             if (it != m_Chunks.end()) {
                 ChunkGenerationData data;
                 data.position = pos;
-                std::memcpy(data.blocks, it->second->getBlocks(), sizeof(data.blocks));
+                // We no longer need to copy data here, the provider will access it.
 
                 {
                     std::lock_guard<std::mutex> jobLock(m_MeshingJobsMutex);
@@ -149,23 +148,23 @@ void World::processFinishedMeshes() {
 
 void World::workerLoop() {
     while (m_IsRunning) {
-        ChunkGenerationData data;
-        m_GenerationQueue.wait_and_pop(data);
+        ChunkGenerationData jobData;
+        m_GenerationQueue.wait_and_pop(jobData);
 
         if (!m_IsRunning) break;
 
-        Chunk tempChunk(data.position.x, data.position.y, data.position.z);
-        tempChunk.setBlocks(&data.blocks[0][0][0]);
-        calculateSunlight(tempChunk); // Recalculate light for the copied data
+        // The critical optimization: gather all necessary chunk data ONCE with a single lock.
+        ChunkMeshingData dataProvider(*this, jobData.position);
 
         IMesher* mesher = m_UseGreedyMesher ? (IMesher*)m_GreedyMesher.get() : (IMesher*)m_SimpleMesher.get();
 
         Mesh tempMesh;
-        mesher->generateMesh(tempChunk, *this, tempMesh);
+        // The mesher now operates on the fast, local data with no connection to the World.
+        mesher->generateMesh(dataProvider, jobData.position, tempMesh);
 
         if (!tempMesh.vertices.empty()) {
             MeshData meshData;
-            meshData.chunkPosition = data.position;
+            meshData.chunkPosition = jobData.position;
             meshData.vertices = std::move(tempMesh.vertices);
             meshData.indices = std::move(tempMesh.indices);
             m_FinishedMeshesQueue.push(std::move(meshData));
@@ -173,7 +172,7 @@ void World::workerLoop() {
 
         {
             std::lock_guard<std::mutex> lock(m_MeshingJobsMutex);
-            m_MeshingJobs.erase(data.position);
+            m_MeshingJobs.erase(jobData.position);
         }
     }
 }

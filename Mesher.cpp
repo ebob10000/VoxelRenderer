@@ -2,205 +2,226 @@
 #include "World.h"
 #include "FaceData.h"
 #include <iostream>
-#include <array>
+#include <vector>
 
+// --- ChunkMeshingData Implementation ---
+
+ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos) {
+    std::shared_lock<std::shared_mutex> lock(world.m_ChunksMutex);
+    int i = 0;
+    for (int z = -1; z <= 1; ++z) {
+        for (int x = -1; x <= 1; ++x) {
+            glm::ivec3 pos = centralChunkPos + glm::ivec3(x, 0, z);
+            auto it = world.m_Chunks.find(pos);
+            if (it != world.m_Chunks.end()) {
+                m_ChunkNeighbors[i] = it->second.get();
+            }
+            else {
+                m_ChunkNeighbors[i] = nullptr;
+            }
+            i++;
+        }
+    }
+}
+
+unsigned char ChunkMeshingData::getBlock(int x, int y, int z) const {
+    if (y < 0 || y >= CHUNK_HEIGHT) return 0; // Air outside vertical bounds
+
+    int chunkX = 1, chunkZ = 1;
+    if (x < 0) chunkX = 0; else if (x >= CHUNK_WIDTH) chunkX = 2;
+    if (z < 0) chunkZ = 0; else if (z >= CHUNK_DEPTH) chunkZ = 2;
+
+    const Chunk* chunk = m_ChunkNeighbors[chunkX + chunkZ * 3];
+    if (chunk) {
+        int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
+        int localZ = (z % CHUNK_DEPTH + CHUNK_DEPTH) % CHUNK_DEPTH;
+        return chunk->getBlock(localX, y, localZ);
+    }
+
+    return 1;
+}
+
+unsigned char ChunkMeshingData::getLight(int x, int y, int z) const {
+    if (y < 0 || y >= CHUNK_HEIGHT) return 0;
+
+    int chunkX = 1, chunkZ = 1;
+    if (x < 0) chunkX = 0; else if (x >= CHUNK_WIDTH) chunkX = 2;
+    if (z < 0) chunkZ = 0; else if (z >= CHUNK_DEPTH) chunkZ = 2;
+
+    const Chunk* chunk = m_ChunkNeighbors[chunkX + chunkZ * 3];
+    if (chunk) {
+        int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
+        int localZ = (z % CHUNK_DEPTH + CHUNK_DEPTH) % CHUNK_DEPTH;
+        return chunk->getLight(localX, y, localZ);
+    }
+    return 15;
+}
+
+// --- Mesher Shared Logic ---
 namespace {
     float calculateAO(bool side1, bool side2, bool corner) {
-        if (side1 && side2) {
-            return 3.0f;
-        }
+        if (side1 && side2) return 3.0f;
         return static_cast<float>(side1 + side2 + corner);
     }
 }
 
-void SimpleMesher::generateMesh(Chunk& chunk, World& world, Mesh& mesh) {
+// --- SimpleMesher Implementation ---
+
+void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) {
     mesh.vertices.clear();
     mesh.indices.clear();
     unsigned int vertexCount = 0;
 
+    int chunkWorldX = chunkPosition.x * CHUNK_WIDTH;
+    int chunkWorldY = chunkPosition.y * CHUNK_HEIGHT;
+    int chunkWorldZ = chunkPosition.z * CHUNK_DEPTH;
+
     for (int y = 0; y < CHUNK_HEIGHT; y++) {
         for (int x = 0; x < CHUNK_WIDTH; x++) {
             for (int z = 0; z < CHUNK_DEPTH; z++) {
-                if (chunk.getBlock(x, y, z) == 0) continue;
-
-                int blockWorldX = chunk.m_Position.x * CHUNK_WIDTH + x;
-                int blockWorldY = chunk.m_Position.y * CHUNK_HEIGHT + y;
-                int blockWorldZ = chunk.m_Position.z * CHUNK_DEPTH + z;
+                if (data.getBlock(x, y, z) == 0) continue;
 
                 auto addFace = [&](int faceIndex) {
-                    float lightLevel = world.getLight(blockWorldX + faceNormals[faceIndex][0], blockWorldY + faceNormals[faceIndex][1], blockWorldZ + faceNormals[faceIndex][2]);
+                    float lightLevel = static_cast<float>(data.getLight(x + faceNormals[faceIndex][0], y + faceNormals[faceIndex][1], z + faceNormals[faceIndex][2]));
 
                     for (int i = 0; i < 4; i++) {
                         int vIndex = (faceIndex * 4 + i);
 
-                        float v_x = faceVertices[vIndex * 5 + 0] + blockWorldX;
-                        float v_y = faceVertices[vIndex * 5 + 1] + blockWorldY;
-                        float v_z = faceVertices[vIndex * 5 + 2] + blockWorldZ;
+                        mesh.vertices.insert(mesh.vertices.end(), {
+                            faceVertices[vIndex * 5 + 0] + chunkWorldX + x,
+                            faceVertices[vIndex * 5 + 1] + chunkWorldY + y,
+                            faceVertices[vIndex * 5 + 2] + chunkWorldZ + z,
+                            faceVertices[vIndex * 5 + 3],
+                            faceVertices[vIndex * 5 + 4]
+                            });
 
-                        mesh.vertices.push_back(v_x);
-                        mesh.vertices.push_back(v_y);
-                        mesh.vertices.push_back(v_z);
-                        mesh.vertices.push_back(faceVertices[vIndex * 5 + 3]);
-                        mesh.vertices.push_back(faceVertices[vIndex * 5 + 4]);
-
-                        bool s1 = world.getBlock(blockWorldX + aoCheck[faceIndex][i][0][0], blockWorldY + aoCheck[faceIndex][i][0][1], blockWorldZ + aoCheck[faceIndex][i][0][2]) != 0;
-                        bool s2 = world.getBlock(blockWorldX + aoCheck[faceIndex][i][1][0], blockWorldY + aoCheck[faceIndex][i][1][1], blockWorldZ + aoCheck[faceIndex][i][1][2]) != 0;
-                        bool c = world.getBlock(blockWorldX + aoCheck[faceIndex][i][2][0], blockWorldY + aoCheck[faceIndex][i][2][1], blockWorldZ + aoCheck[faceIndex][i][2][2]) != 0;
+                        bool s1 = data.getBlock(x + aoCheck[faceIndex][i][0][0], y + aoCheck[faceIndex][i][0][1], z + aoCheck[faceIndex][i][0][2]) != 0;
+                        bool s2 = data.getBlock(x + aoCheck[faceIndex][i][1][0], y + aoCheck[faceIndex][i][1][1], z + aoCheck[faceIndex][i][1][2]) != 0;
+                        bool c = data.getBlock(x + aoCheck[faceIndex][i][2][0], y + aoCheck[faceIndex][i][2][1], z + aoCheck[faceIndex][i][2][2]) != 0;
 
                         mesh.vertices.push_back(calculateAO(s1, s2, c));
                         mesh.vertices.push_back(lightLevel);
                     }
-                    for (int i = 0; i < 6; i++) {
-                        mesh.indices.push_back(faceIndices[i] + vertexCount);
-                    }
+                    mesh.indices.insert(mesh.indices.end(), { vertexCount, vertexCount + 1, vertexCount + 2, vertexCount + 2, vertexCount + 3, vertexCount });
                     vertexCount += 4;
                     };
 
-                if (world.getBlock(blockWorldX - 1, blockWorldY, blockWorldZ) == 0) addFace(0);
-                if (world.getBlock(blockWorldX + 1, blockWorldY, blockWorldZ) == 0) addFace(1);
-                if (world.getBlock(blockWorldX, blockWorldY - 1, blockWorldZ) == 0) addFace(2);
-                if (world.getBlock(blockWorldX, blockWorldY + 1, blockWorldZ) == 0) addFace(3);
-                if (world.getBlock(blockWorldX, blockWorldY, blockWorldZ - 1) == 0) addFace(4);
-                if (world.getBlock(blockWorldX, blockWorldY, blockWorldZ + 1) == 0) addFace(5);
+                if (data.getBlock(x - 1, y, z) == 0) addFace(0);
+                if (data.getBlock(x + 1, y, z) == 0) addFace(1);
+                if (data.getBlock(x, y - 1, z) == 0) addFace(2);
+                if (data.getBlock(x, y + 1, z) == 0) addFace(3);
+                if (data.getBlock(x, y, z - 1) == 0) addFace(4);
+                if (data.getBlock(x, y, z + 1) == 0) addFace(5);
             }
         }
     }
 }
 
-void GreedyMesher::generateMesh(Chunk& chunk, World& world, Mesh& mesh) {
+// --- GreedyMesher Implementation ---
+namespace {
+    struct FaceInfo {
+        bool visible = false;
+        unsigned char light = 0;
+        std::array<float, 4> ao{};
+
+        bool operator==(const FaceInfo& other) const {
+            return visible == other.visible && light == other.light && ao == other.ao;
+        }
+    };
+}
+
+void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) {
     mesh.vertices.clear();
     mesh.indices.clear();
     unsigned int vertexCount = 0;
 
-    int chunkWorldX = chunk.m_Position.x * CHUNK_WIDTH;
-    int chunkWorldY = chunk.m_Position.y * CHUNK_HEIGHT;
-    int chunkWorldZ = chunk.m_Position.z * CHUNK_DEPTH;
+    int chunkWorldX = chunkPosition.x * CHUNK_WIDTH;
+    int chunkWorldY = chunkPosition.y * CHUNK_HEIGHT;
+    int chunkWorldZ = chunkPosition.z * CHUNK_DEPTH;
 
-    for (int axis = 0; axis < 3; axis++) {
-        for (int dir = 0; dir < 2; dir++) {
+    for (int axis = 0; axis < 3; ++axis) {
+        for (int dir = 0; dir < 2; ++dir) {
             bool positive = (dir == 1);
+            int faceIndex = axis * 2 + dir;
 
             int u_axis = (axis + 1) % 3;
             int v_axis = (axis + 2) % 3;
 
-            int size[3] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_DEPTH };
+            for (int d = 0; d < CHUNK_HEIGHT; ++d) {
+                std::vector<FaceInfo> sliceData(CHUNK_WIDTH * CHUNK_DEPTH);
 
-            for (int d = 0; d < size[axis]; d++) {
-                bool mask[CHUNK_WIDTH * CHUNK_HEIGHT] = { false };
-
-                for (int u = 0; u < size[u_axis]; u++) {
-                    for (int v = 0; v < size[v_axis]; v++) {
+                // Pass 1: Pre-calculate lighting and visibility for the entire slice
+                for (int u = 0; u < CHUNK_WIDTH; ++u) {
+                    for (int v = 0; v < CHUNK_DEPTH; ++v) {
                         int pos[3];
-                        pos[axis] = d;
-                        pos[u_axis] = u;
-                        pos[v_axis] = v;
+                        pos[axis] = d; pos[u_axis] = u; pos[v_axis] = v;
 
-                        int x = pos[0], y = pos[1], z = pos[2];
-                        if (chunk.getBlock(x, y, z) == 0) continue;
+                        int normal[3] = { 0 }; normal[axis] = positive ? 1 : -1;
 
-                        int nx = x, ny = y, nz = z;
-                        if (axis == 0) { nx += positive ? 1 : -1; }
-                        else if (axis == 1) { ny += positive ? 1 : -1; }
-                        else { nz += positive ? 1 : -1; }
-
-                        if (world.getBlock(chunkWorldX + nx, chunkWorldY + ny, chunkWorldZ + nz) == 0) {
-                            mask[u + v * size[u_axis]] = true;
+                        if (data.getBlock(pos[0], pos[1], pos[2]) != 0 && data.getBlock(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]) == 0) {
+                            FaceInfo& info = sliceData[u + v * CHUNK_WIDTH];
+                            info.visible = true;
+                            info.light = data.getLight(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]);
+                            for (int i = 0; i < 4; ++i) {
+                                bool s1 = data.getBlock(pos[0] + aoCheck[faceIndex][i][0][0], pos[1] + aoCheck[faceIndex][i][0][1], pos[2] + aoCheck[faceIndex][i][0][2]) != 0;
+                                bool s2 = data.getBlock(pos[0] + aoCheck[faceIndex][i][1][0], pos[1] + aoCheck[faceIndex][i][1][1], pos[2] + aoCheck[faceIndex][i][1][2]) != 0;
+                                bool c = data.getBlock(pos[0] + aoCheck[faceIndex][i][2][0], pos[1] + aoCheck[faceIndex][i][2][1], pos[2] + aoCheck[faceIndex][i][2][2]) != 0;
+                                info.ao[i] = calculateAO(s1, s2, c);
+                            }
                         }
                     }
                 }
 
-                for (int v_iter = 0; v_iter < size[v_axis]; v_iter++) {
-                    for (int u_iter = 0; u_iter < size[u_axis]; u_iter++) {
-                        if (!mask[u_iter + v_iter * size[u_axis]]) continue;
+                // Pass 2: Greedy meshing based on compatible lighting
+                for (int v = 0; v < CHUNK_DEPTH; ++v) {
+                    for (int u = 0; u < CHUNK_WIDTH; ++u) {
+                        if (!sliceData[u + v * CHUNK_WIDTH].visible) continue;
+
+                        FaceInfo currentFace = sliceData[u + v * CHUNK_WIDTH];
 
                         int width = 1;
-                        while (u_iter + width < size[u_axis] && mask[u_iter + width + v_iter * size[u_axis]]) {
+                        while (u + width < CHUNK_WIDTH && sliceData[u + width + v * CHUNK_WIDTH] == currentFace) {
                             width++;
                         }
 
                         int height = 1;
                         bool done = false;
-                        for (int h = 1; v_iter + h < size[v_axis] && !done; h++) {
-                            for (int w = 0; w < width; w++) {
-                                if (!mask[u_iter + w + (v_iter + h) * size[u_axis]]) {
-                                    done = true;
-                                    break;
-                                }
+                        for (int h = 1; v + h < CHUNK_DEPTH; ++h) {
+                            for (int w = 0; w < width; ++w) {
+                                if (!(sliceData[u + w + (v + h) * CHUNK_WIDTH] == currentFace)) { done = true; break; }
                             }
-                            if (!done) height++;
+                            if (!done) height++; else break;
                         }
 
-                        for (int h = 0; h < height; h++) {
-                            for (int w = 0; w < width; w++) {
-                                mask[u_iter + w + (v_iter + h) * size[u_axis]] = false;
+                        for (int h = 0; h < height; ++h) {
+                            for (int w = 0; w < width; ++w) {
+                                sliceData[u + w + (v + h) * CHUNK_WIDTH].visible = false;
                             }
                         }
 
-                        float quad_pos[3];
-                        quad_pos[axis] = static_cast<float>(d);
-                        quad_pos[u_axis] = static_cast<float>(u_iter);
-                        quad_pos[v_axis] = static_cast<float>(v_iter);
-
-                        float du[3] = { 0 }, dv[3] = { 0 };
-                        du[u_axis] = static_cast<float>(width);
-                        dv[v_axis] = static_cast<float>(height);
-
-                        int normal[3] = { 0 };
-                        normal[axis] = positive ? 1 : -1;
-
-                        float lightLevel = world.getLight(
-                            chunkWorldX + static_cast<int>(quad_pos[0]) + normal[0],
-                            chunkWorldY + static_cast<int>(quad_pos[1]) + normal[1],
-                            chunkWorldZ + static_cast<int>(quad_pos[2]) + normal[2])
-                            ;
-
-                        float ao[4];
-                        int faceIndex = axis * 2 + dir;
-
-                        std::array<int, 3> base_pos = { static_cast<int>(quad_pos[0]), static_cast<int>(quad_pos[1]), static_cast<int>(quad_pos[2]) };
-                        std::array<int, 3> du_a = { static_cast<int>(du[0]), static_cast<int>(du[1]), static_cast<int>(du[2]) };
-                        std::array<int, 3> dv_a = { static_cast<int>(dv[0]), static_cast<int>(dv[1]), static_cast<int>(dv[2]) };
-
-                        std::array<int, 3> corner_pos[4] = {
-                            base_pos,
-                            {base_pos[0] + du_a[0], base_pos[1] + du_a[1], base_pos[2] + du_a[2]},
-                            {base_pos[0] + du_a[0] + dv_a[0], base_pos[1] + du_a[1] + dv_a[1], base_pos[2] + du_a[2] + dv_a[2]},
-                            {base_pos[0] + dv_a[0], base_pos[1] + dv_a[1], base_pos[2] + dv_a[2]}
-                        };
-
-                        for (int i = 0; i < 4; ++i) {
-                            bool s1 = world.getBlock(chunkWorldX + corner_pos[i][0] + aoCheck[faceIndex][i][0][0], chunkWorldY + corner_pos[i][1] + aoCheck[faceIndex][i][0][1], chunkWorldZ + corner_pos[i][2] + aoCheck[faceIndex][i][0][2]) != 0;
-                            bool s2 = world.getBlock(chunkWorldX + corner_pos[i][0] + aoCheck[faceIndex][i][1][0], chunkWorldY + corner_pos[i][1] + aoCheck[faceIndex][i][1][1], chunkWorldZ + corner_pos[i][2] + aoCheck[faceIndex][i][1][2]) != 0;
-                            bool c = world.getBlock(chunkWorldX + corner_pos[i][0] + aoCheck[faceIndex][i][2][0], chunkWorldY + corner_pos[i][1] + aoCheck[faceIndex][i][2][1], chunkWorldZ + corner_pos[i][2] + aoCheck[faceIndex][i][2][2]) != 0;
-                            ao[i] = calculateAO(s1, s2, c);
-                        }
+                        float quad_pos[3]; quad_pos[axis] = static_cast<float>(d); quad_pos[u_axis] = static_cast<float>(u); quad_pos[v_axis] = static_cast<float>(v);
+                        float du[3] = { 0 }, dv[3] = { 0 }; du[u_axis] = static_cast<float>(width); dv[v_axis] = static_cast<float>(height);
 
                         float offset = positive ? 0.5f : -0.5f;
-                        float v[4][3];
-                        for (int i = 0; i < 3; i++) {
+                        float vert[4][3];
+                        for (int i = 0; i < 3; ++i) {
                             float base = (i == axis) ? (quad_pos[i] + offset) : (quad_pos[i] - 0.5f);
                             if (i == 0) base += chunkWorldX; else if (i == 1) base += chunkWorldY; else base += chunkWorldZ;
-                            v[0][i] = base;
-                            v[1][i] = base + du[i];
-                            v[2][i] = base + du[i] + dv[i];
-                            v[3][i] = base + dv[i];
+                            vert[0][i] = base; vert[1][i] = base + du[i]; vert[2][i] = base + du[i] + dv[i]; vert[3][i] = base + dv[i];
                         }
 
-                        auto push_vert = [&](int i, float u_tex, float v_tex, float ao_val) {
-                            mesh.vertices.insert(mesh.vertices.end(), { v[i][0], v[i][1], v[i][2], u_tex, v_tex, ao_val, lightLevel });
+                        auto push_vert = [&](int vert_idx, float ao_val) {
+                            float u_tex, v_tex;
+                            if (axis == 1) { u_tex = vert[vert_idx][0]; v_tex = vert[vert_idx][2]; }
+                            else { u_tex = (axis == 0) ? vert[vert_idx][2] : vert[vert_idx][0]; v_tex = vert[vert_idx][1]; }
+                            mesh.vertices.insert(mesh.vertices.end(), { vert[vert_idx][0], vert[vert_idx][1], vert[vert_idx][2], u_tex, v_tex, ao_val, static_cast<float>(currentFace.light) });
                             };
 
                         if (positive) {
-                            push_vert(0, 0, 0, ao[0]);
-                            push_vert(1, static_cast<float>(width), 0, ao[1]);
-                            push_vert(2, static_cast<float>(width), static_cast<float>(height), ao[2]);
-                            push_vert(3, 0, static_cast<float>(height), ao[3]);
+                            push_vert(0, currentFace.ao[0]); push_vert(1, currentFace.ao[1]); push_vert(2, currentFace.ao[2]); push_vert(3, currentFace.ao[3]);
                         }
                         else {
-                            push_vert(0, 0, 0, ao[0]);
-                            push_vert(3, 0, static_cast<float>(height), ao[3]);
-                            push_vert(2, static_cast<float>(width), static_cast<float>(height), ao[2]);
-                            push_vert(1, static_cast<float>(width), 0, ao[1]);
+                            push_vert(0, currentFace.ao[0]); push_vert(3, currentFace.ao[3]); push_vert(2, currentFace.ao[2]); push_vert(1, currentFace.ao[1]);
                         }
 
                         mesh.indices.insert(mesh.indices.end(), { vertexCount + 0, vertexCount + 1, vertexCount + 2, vertexCount + 2, vertexCount + 3, vertexCount + 0 });

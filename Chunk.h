@@ -4,10 +4,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
-// Forward declarations
 struct Mesh;
-class IMesher;
-class World;
 
 const int CHUNK_WIDTH = 16;
 const int CHUNK_HEIGHT = 16;
@@ -20,8 +17,6 @@ public:
     unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
 
     Chunk(int x, int y, int z);
-
-    void createMesh(IMesher& mesher, World& world);
 
     void draw();
 

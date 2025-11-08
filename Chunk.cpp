@@ -1,15 +1,9 @@
 #include "Chunk.h"
 #include "Mesh.h"
-#include "Mesher.h"
 #include <cstring>
 
 Chunk::Chunk(int x, int y, int z) : m_Position(x, y, z) {
     m_Mesh = std::make_unique<Mesh>();
-}
-
-void Chunk::createMesh(IMesher& mesher, World& world) {
-    mesher.generateMesh(*this, world, *m_Mesh);
-    m_Mesh->upload();
 }
 
 void Chunk::draw() {
@@ -38,7 +32,7 @@ void Chunk::setBlocks(const unsigned char* data) {
 
 unsigned char Chunk::getLight(int x, int y, int z) const {
     if (x < 0 || x >= CHUNK_WIDTH || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_DEPTH) {
-        return 15; // Assume fully lit outside chunk
+        return 15;
     }
     return lightLevels[x][y][z];
 }
