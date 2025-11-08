@@ -1,19 +1,16 @@
 #include "Mesher.h"
 #include "World.h"
 #include "FaceData.h"
-#include "Block.h" // Include our new block definitions
+#include "Block.h"
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <algorithm> // For std::swap
 
-// --- Constants for Texture Atlas ---
-// IMPORTANT: Update these if you change your atlas.png dimensions
-const float ATLAS_WIDTH_TILES = 2.0f;
-const float ATLAS_HEIGHT_TILES = 2.0f;
+const float ATLAS_WIDTH_TILES = 16.0f;
+const float ATLAS_HEIGHT_TILES = 16.0f;
 const float TILE_WIDTH_NORMALIZED = 1.0f / ATLAS_WIDTH_TILES;
 const float TILE_HEIGHT_NORMALIZED = 1.0f / ATLAS_HEIGHT_TILES;
-
-// --- ChunkMeshingData Implementation ---
 
 ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos) {
     std::array<std::shared_ptr<const Chunk>, 9> neighbors{};
@@ -32,68 +29,49 @@ ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkP
         }
     }
 
-    if (neighbors[4]) {
+    std::memset(m_Blocks, 0, sizeof(m_Blocks));
+    std::memset(m_LightLevels, 15, sizeof(m_LightLevels));
+
+    if (neighbors[4]) { // Central chunk
         for (int y = 0; y < CHUNK_HEIGHT; ++y) {
             for (int z = 0; z < CHUNK_DEPTH; ++z) {
                 for (int x = 0; x < CHUNK_WIDTH; ++x) {
-                    m_Blocks[x + 1][y][z + 1] = neighbors[4]->getBlock(x, y, z);
-                    m_LightLevels[x + 1][y][z + 1] = neighbors[4]->getLight(x, y, z);
+                    m_Blocks[x + 1][y][z + 1] = neighbors[4]->blocks[x][y][z];
+                    m_LightLevels[x + 1][y][z + 1] = neighbors[4]->lightLevels[x][y][z];
                 }
             }
         }
     }
 
+    // -X neighbor
     if (neighbors[3]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int z = 0; z < CHUNK_DEPTH; ++z) {
-            m_Blocks[0][y][z + 1] = neighbors[3]->getBlock(CHUNK_WIDTH - 1, y, z);
-            m_LightLevels[0][y][z + 1] = neighbors[3]->getLight(CHUNK_WIDTH - 1, y, z);
+            m_Blocks[0][y][z + 1] = neighbors[3]->blocks[CHUNK_WIDTH - 1][y][z];
+            m_LightLevels[0][y][z + 1] = neighbors[3]->lightLevels[CHUNK_WIDTH - 1][y][z];
         }
     }
+    // +X neighbor
     if (neighbors[5]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int z = 0; z < CHUNK_DEPTH; ++z) {
-            m_Blocks[CHUNK_WIDTH + 1][y][z + 1] = neighbors[5]->getBlock(0, y, z);
-            m_LightLevels[CHUNK_WIDTH + 1][y][z + 1] = neighbors[5]->getLight(0, y, z);
+            m_Blocks[CHUNK_WIDTH + 1][y][z + 1] = neighbors[5]->blocks[0][y][z];
+            m_LightLevels[CHUNK_WIDTH + 1][y][z + 1] = neighbors[5]->lightLevels[0][y][z];
         }
     }
+    // -Z neighbor
     if (neighbors[1]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int x = 0; x < CHUNK_WIDTH; ++x) {
-            m_Blocks[x + 1][y][0] = neighbors[1]->getBlock(x, y, CHUNK_DEPTH - 1);
-            m_LightLevels[x + 1][y][0] = neighbors[1]->getLight(x, y, CHUNK_DEPTH - 1);
+            m_Blocks[x + 1][y][0] = neighbors[1]->blocks[x][y][CHUNK_DEPTH - 1];
+            m_LightLevels[x + 1][y][0] = neighbors[1]->lightLevels[x][y][CHUNK_DEPTH - 1];
         }
     }
+    // +Z neighbor
     if (neighbors[7]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int x = 0; x < CHUNK_WIDTH; ++x) {
-            m_Blocks[x + 1][y][CHUNK_DEPTH + 1] = neighbors[7]->getBlock(x, y, 0);
-            m_LightLevels[x + 1][y][CHUNK_DEPTH + 1] = neighbors[7]->getLight(x, y, 0);
-        }
-    }
-
-    if (neighbors[0]) {
-        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-            m_Blocks[0][y][0] = neighbors[0]->getBlock(CHUNK_WIDTH - 1, y, CHUNK_DEPTH - 1);
-            m_LightLevels[0][y][0] = neighbors[0]->getLight(CHUNK_WIDTH - 1, y, CHUNK_DEPTH - 1);
-        }
-    }
-    if (neighbors[2]) {
-        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-            m_Blocks[CHUNK_WIDTH + 1][y][0] = neighbors[2]->getBlock(0, y, CHUNK_DEPTH - 1);
-            m_LightLevels[CHUNK_WIDTH + 1][y][0] = neighbors[2]->getLight(0, y, CHUNK_DEPTH - 1);
-        }
-    }
-    if (neighbors[6]) {
-        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-            m_Blocks[0][y][CHUNK_DEPTH + 1] = neighbors[6]->getBlock(CHUNK_WIDTH - 1, y, 0);
-            m_LightLevels[0][y][CHUNK_DEPTH + 1] = neighbors[6]->getLight(CHUNK_WIDTH - 1, y, 0);
-        }
-    }
-    if (neighbors[8]) {
-        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-            m_Blocks[CHUNK_WIDTH + 1][y][CHUNK_DEPTH + 1] = neighbors[8]->getBlock(0, y, 0);
-            m_LightLevels[CHUNK_WIDTH + 1][y][CHUNK_DEPTH + 1] = neighbors[8]->getLight(0, y, 0);
+            m_Blocks[x + 1][y][CHUNK_DEPTH + 1] = neighbors[7]->blocks[x][y][0];
+            m_LightLevels[x + 1][y][CHUNK_DEPTH + 1] = neighbors[7]->lightLevels[x][y][0];
         }
     }
 }
-
 
 unsigned char ChunkMeshingData::getBlock(int x, int y, int z) const {
     if (y < 0 || y >= CHUNK_HEIGHT) return 0;
@@ -105,244 +83,253 @@ unsigned char ChunkMeshingData::getLight(int x, int y, int z) const {
     return m_LightLevels[x + 1][y][z + 1];
 }
 
-
-// --- Mesher Shared Logic ---
 namespace {
-    float calculateAO(bool side1, bool side2, bool corner) {
-        if (side1 && side2) {
-            return 3.0f;
-        }
+    inline bool isOpaque(unsigned char blockID) {
+        return blockID != 0 && blockID != (unsigned char)BlockID::Water;
+    }
+
+    inline float calculateAO(bool side1, bool side2, bool corner) {
+        if (side1 && side2) return 3.0f;
         return static_cast<float>(side1 + side2 + corner);
     }
 }
 
-// --- SimpleMesher Implementation ---
 void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) {
     mesh.vertices.clear();
     mesh.indices.clear();
+
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
     unsigned int vertexCount = 0;
 
-    mesh.vertices.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH * 2 * 4 * 7);
-    mesh.indices.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH * 2 * 6);
+    const float TILE_WIDTH_NORMALIZED = 1.0f / ATLAS_WIDTH_TILES;
+    const float TILE_HEIGHT_NORMALIZED = 1.0f / ATLAS_HEIGHT_TILES;
 
-    int chunkWorldX = chunkPosition.x * CHUNK_WIDTH;
-    int chunkWorldY = chunkPosition.y * CHUNK_HEIGHT;
-    int chunkWorldZ = chunkPosition.z * CHUNK_DEPTH;
+    for (int x = 0; x < CHUNK_WIDTH; ++x) {
+        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+            for (int z = 0; z < CHUNK_DEPTH; ++z) {
+                unsigned char blockRaw = data.getBlock(x, y, z);
+                if (blockRaw == 0) continue;
 
-    auto addFace = [&](int x, int y, int z, int faceIndex) {
-        BlockID blockID = (BlockID)data.getBlock(x, y, z);
-        const BlockData& blockData = BlockDataManager::getData(blockID);
-        glm::ivec2 texCoords = blockData.faces[faceIndex].tex_coords;
+                BlockID blockID = static_cast<BlockID>(blockRaw);
+                const BlockData& blockData = BlockDataManager::getData(blockID);
 
-        float u_min = texCoords.x * TILE_WIDTH_NORMALIZED;
-        float v_min = texCoords.y * TILE_HEIGHT_NORMALIZED;
-        float u_max = u_min + TILE_WIDTH_NORMALIZED;
-        float v_max = v_min + TILE_HEIGHT_NORMALIZED;
+                for (int faceIndex = 0; faceIndex < 6; ++faceIndex) {
+                    int nx = x + faceNormals[faceIndex][0];
+                    int ny = y + faceNormals[faceIndex][1];
+                    int nz = z + faceNormals[faceIndex][2];
 
-        const float faceUVs[4][2] = {
-            {u_min, v_min}, {u_max, v_min}, {u_max, v_max}, {u_min, v_max}
-        };
-
-        float lightLevel = static_cast<float>(data.getLight(x + faceNormals[faceIndex][0], y + faceNormals[faceIndex][1], z + faceNormals[faceIndex][2]));
-        float ao[4];
-
-        for (int i = 0; i < 4; i++) {
-            int vIndex = (faceIndex * 4 + i);
-
-            mesh.vertices.insert(mesh.vertices.end(), {
-                faceVertices[vIndex * 5 + 0] + chunkWorldX + x,
-                faceVertices[vIndex * 5 + 1] + chunkWorldY + y,
-                faceVertices[vIndex * 5 + 2] + chunkWorldZ + z,
-                faceUVs[i][0],
-                faceUVs[i][1]
-                });
-
-            bool s1 = data.getBlock(x + aoCheck[faceIndex][i][0][0], y + aoCheck[faceIndex][i][0][1], z + aoCheck[faceIndex][i][0][2]) != 0;
-            bool s2 = data.getBlock(x + aoCheck[faceIndex][i][1][0], y + aoCheck[faceIndex][i][1][1], z + aoCheck[faceIndex][i][1][2]) != 0;
-            bool c = data.getBlock(x + aoCheck[faceIndex][i][2][0], y + aoCheck[faceIndex][i][2][1], z + aoCheck[faceIndex][i][2][2]) != 0;
-
-            ao[i] = calculateAO(s1, s2, c);
-            mesh.vertices.push_back(ao[i]);
-            mesh.vertices.push_back(lightLevel);
-        }
-
-        if (ao[0] + ao[2] > ao[1] + ao[3]) {
-            mesh.indices.insert(mesh.indices.end(), { vertexCount, vertexCount + 1, vertexCount + 3, vertexCount + 1, vertexCount + 2, vertexCount + 3 });
-        }
-        else {
-            mesh.indices.insert(mesh.indices.end(), { vertexCount, vertexCount + 1, vertexCount + 2, vertexCount + 2, vertexCount + 3, vertexCount });
-        }
-        vertexCount += 4;
-        };
-
-    for (int y = 0; y < CHUNK_HEIGHT; y++) {
-        for (int x = 0; x < CHUNK_WIDTH; x++) {
-            for (int z = 0; z < CHUNK_DEPTH; z++) {
-                BlockID currentBlock = (BlockID)data.getBlock(x, y, z);
-                if (currentBlock != BlockID::Air) continue;
-
-                auto checkNeighbor = [&](int nx, int ny, int nz, int face) {
-                    BlockID neighborID = (BlockID)data.getBlock(nx, ny, nz);
-                    if (neighborID != BlockID::Air) {
-                        addFace(nx, ny, nz, face);
+                    unsigned char adjacentBlock = data.getBlock(nx, ny, nz);
+                    if (isOpaque(blockRaw) == isOpaque(adjacentBlock)) {
+                        continue;
                     }
+
+                    float ao[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+                    float lightVal[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+                    for (int vi = 0; vi < 4; ++vi) {
+                        const int (*offsets)[3] = aoCheck[faceIndex][vi];
+                        bool s1 = isOpaque(data.getBlock(x + offsets[0][0], y + offsets[0][1], z + offsets[0][2]));
+                        bool s2 = isOpaque(data.getBlock(x + offsets[1][0], y + offsets[1][1], z + offsets[1][2]));
+                        bool c = isOpaque(data.getBlock(x + offsets[2][0], y + offsets[2][1], z + offsets[2][2]));
+                        ao[vi] = calculateAO(s1, s2, c);
+
+                        glm::ivec3 light_pos = { x, y, z };
+                        light_pos[faceIndex / 2] += (faceIndex % 2 == 0 ? -1 : 1);
+                        lightVal[vi] = static_cast<float>(data.getLight(light_pos.x, light_pos.y, light_pos.z));
+                    }
+
+                    float face_verts[4][3];
+                    for (int vi = 0; vi < 4; ++vi) {
+                        const float* src = faceVertices + (faceIndex * 4 + vi) * 5;
+                        face_verts[vi][0] = src[0];
+                        face_verts[vi][1] = src[1];
+                        face_verts[vi][2] = src[2];
+                    }
+
+                    float block_pos[3] = {
+                        static_cast<float>(x) + 0.5f,
+                        static_cast<float>(y) + 0.5f,
+                        static_cast<float>(z) + 0.5f
                     };
 
-                checkNeighbor(x - 1, y, z, 1); // +X face on neighbor
-                checkNeighbor(x + 1, y, z, 0); // -X face on neighbor
-                checkNeighbor(x, y - 1, z, 3); // +Y face on neighbor
-                checkNeighbor(x, y + 1, z, 2); // -Y face on neighbor
-                checkNeighbor(x, y, z - 1, 5); // +Z face on neighbor
-                checkNeighbor(x, y, z + 1, 4); // -Z face on neighbor
+                    if (ao[0] + ao[2] > ao[1] + ao[3]) {
+                        indices.push_back(vertexCount);
+                        indices.push_back(vertexCount + 1);
+                        indices.push_back(vertexCount + 3);
+                        indices.push_back(vertexCount + 1);
+                        indices.push_back(vertexCount + 2);
+                        indices.push_back(vertexCount + 3);
+                    }
+                    else {
+                        indices.push_back(vertexCount);
+                        indices.push_back(vertexCount + 1);
+                        indices.push_back(vertexCount + 2);
+                        indices.push_back(vertexCount + 2);
+                        indices.push_back(vertexCount + 3);
+                        indices.push_back(vertexCount);
+                    }
+                    vertexCount += 4;
+                }
             }
         }
     }
+
+    mesh.vertices = std::move(vertices);
+    mesh.indices = std::move(indices);
 }
-
-// --- GreedyMesher Implementation ---
-namespace {
-    struct FaceInfo {
-        bool visible = false;
-        unsigned char light = 0;
-        BlockID blockID = BlockID::Air;
-
-        bool operator==(const FaceInfo& other) const {
-            return visible == other.visible && light == other.light && blockID == other.blockID;
-        }
-    };
-}
-
 void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) {
     mesh.vertices.clear();
     mesh.indices.clear();
+
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
     unsigned int vertexCount = 0;
 
-    mesh.vertices.reserve(4096 * 7);
-    mesh.indices.reserve(2048 * 6);
+    const int sizes[3] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_DEPTH };
 
-    int chunkWorldX = chunkPosition.x * CHUNK_WIDTH;
-    int chunkWorldY = chunkPosition.y * CHUNK_HEIGHT;
-    int chunkWorldZ = chunkPosition.z * CHUNK_DEPTH;
+    for (int direction = 0; direction < 6; ++direction) {
+        int normalAxis = direction / 2;
+        int uAxis = (normalAxis + 1) % 3;
+        int vAxis = (normalAxis + 2) % 3;
+        int sign = (direction % 2 == 0) ? -1 : 1;
 
-    for (int axis = 0; axis < 3; ++axis) {
-        for (int dir = 0; dir < 2; ++dir) {
-            bool positive = (dir == 1);
-            int faceIndex = axis * 2 + dir;
+        int size_u = sizes[uAxis];
+        int size_v = sizes[vAxis];
+        int size_n = sizes[normalAxis];
 
-            int u_axis = (axis + 1) % 3;
-            int v_axis = (axis + 2) % 3;
+        glm::ivec3 normalVec = { faceNormals[direction][0], faceNormals[direction][1], faceNormals[direction][2] };
 
-            for (int d = 0; d < CHUNK_HEIGHT; ++d) {
-                std::vector<FaceInfo> sliceData(CHUNK_WIDTH * CHUNK_DEPTH);
+        for (int w = 0; w < size_n; ++w) {
+            std::vector<std::vector<char>> mask(size_u, std::vector<char>(size_v, 0));
 
-                for (int u = 0; u < CHUNK_WIDTH; ++u) {
-                    for (int v = 0; v < CHUNK_DEPTH; ++v) {
-                        int pos[3];
-                        pos[axis] = d; pos[u_axis] = u; pos[v_axis] = v;
+            for (int j = 0; j < size_v; ++j) {
+                for (int i = 0; i < size_u; ) {
+                    int pos[3];
+                    pos[uAxis] = i;
+                    pos[vAxis] = j;
+                    pos[normalAxis] = w;
 
-                        int normal[3] = { 0 }; normal[axis] = positive ? 1 : -1;
+                    int x = pos[0], y = pos[1], z = pos[2];
+                    BlockID blockID = static_cast<BlockID>(data.getBlock(x, y, z));
+                    if (blockID == BlockID::Air || mask[i][j]) {
+                        ++i;
+                        continue;
+                    }
 
-                        BlockID currentBlock = (BlockID)data.getBlock(pos[0], pos[1], pos[2]);
-                        BlockID neighborBlock = (BlockID)data.getBlock(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]);
+                    int adj[3] = { x + normalVec[0], y + normalVec[1], z + normalVec[2] };
+                    unsigned char adjacentBlock = data.getBlock(adj[0], adj[1], adj[2]);
+                    if (isOpaque((unsigned char)blockID) == isOpaque(adjacentBlock)) {
+                        ++i;
+                        continue;
+                    }
 
-                        if (currentBlock != BlockID::Air && neighborBlock == BlockID::Air) {
-                            FaceInfo& info = sliceData[u + v * CHUNK_WIDTH];
-                            info.visible = true;
-                            info.blockID = currentBlock;
-                            info.light = data.getLight(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]);
+                    const BlockData& blockData = BlockDataManager::getData(blockID);
+                    glm::ivec2 texCoords = blockData.faces[direction].tex_coords;
+                    float u0 = texCoords.x * TILE_WIDTH_NORMALIZED;
+                    float v0 = texCoords.y * TILE_HEIGHT_NORMALIZED;
+
+                    int quadW = 1;
+                    for (int ww = 1; i + ww < size_u; ++ww) {
+                        int tpos[3];
+                        tpos[uAxis] = i + ww;
+                        tpos[vAxis] = j;
+                        tpos[normalAxis] = w;
+                        int tx = tpos[0], ty = tpos[1], tz = tpos[2];
+                        BlockID tblock = static_cast<BlockID>(data.getBlock(tx, ty, tz));
+                        if (tblock != blockID || mask[i + ww][j]) break;
+                        int tadj[3] = { tx + normalVec[0], ty + normalVec[1], tz + normalVec[2] };
+                        unsigned char adjacentBlock = data.getBlock(tadj[0], tadj[1], tadj[2]);
+                        if (isOpaque((unsigned char)tblock) == isOpaque(adjacentBlock)) break;
+                        ++quadW;
+                    }
+
+                    int quadH = 1;
+                    for (int hh = 1; j + hh < size_v; ++hh) {
+                        bool canExtend = true;
+                        for (int ww = 0; ww < quadW; ++ww) {
+                            int tpos[3];
+                            tpos[uAxis] = i + ww;
+                            tpos[vAxis] = j + hh;
+                            tpos[normalAxis] = w;
+                            int tx = tpos[0], ty = tpos[1], tz = tpos[2];
+                            BlockID tblock = static_cast<BlockID>(data.getBlock(tx, ty, tz));
+                            if (tblock != blockID || mask[i + ww][j + hh]) {
+                                canExtend = false;
+                                break;
+                            }
+                            int tadj[3] = { tx + normalVec[0], ty + normalVec[1], tz + normalVec[2] };
+                            unsigned char adjacentBlock = data.getBlock(tadj[0], tadj[1], tadj[2]);
+                            if (isOpaque((unsigned char)tblock) == isOpaque(adjacentBlock)) {
+                                canExtend = false;
+                                break;
+                            }
+                        }
+                        if (!canExtend) break;
+                        ++quadH;
+                    }
+
+                    glm::ivec3 block_corner[4];
+                    block_corner[0][uAxis] = i; block_corner[0][vAxis] = j; block_corner[0][normalAxis] = w;
+                    block_corner[1][uAxis] = i + quadW; block_corner[1][vAxis] = j; block_corner[1][normalAxis] = w;
+                    block_corner[2][uAxis] = i + quadW; block_corner[2][vAxis] = j + quadH; block_corner[2][normalAxis] = w;
+                    block_corner[3][uAxis] = i; block_corner[3][vAxis] = j + quadH; block_corner[3][normalAxis] = w;
+
+                    for (int vi = 0; vi < 4; ++vi) {
+                        glm::ivec3 pos = block_corner[vi];
+                        glm::ivec3 light_pos = pos;
+                        light_pos[normalAxis] += sign;
+                        lightVal[vi] = static_cast<float>(data.getLight(light_pos.x, light_pos.y, light_pos.z));
+
+                        const int (*offsets)[3] = aoCheck[direction][vi];
+                        bool s1 = isOpaque(data.getBlock(pos.x + offsets[0][0], pos.y + offsets[0][1], pos.z + offsets[0][2]));
+                        bool s2 = isOpaque(data.getBlock(pos.x + offsets[1][0], pos.y + offsets[1][1], pos.z + offsets[1][2]));
+                        bool c = isOpaque(data.getBlock(pos.x + offsets[2][0], pos.y + offsets[2][1], pos.z + offsets[2][2]));
+                        ao[vi] = calculateAO(s1, s2, c);
+                    }
+
+                    float face_verts[4][3];
+                    for (int vi = 0; vi < 4; ++vi) {
+                        const float* src = faceVertices + (direction * 4 + vi) * 5;
+                        face_verts[vi][0] = src[0];
+                        face_verts[vi][1] = src[1];
+                        face_verts[vi][2] = src[2];
+                    }
+
+                    float start_u = static_cast<float>(i);
+                    float start_v = static_cast<float>(j);
+                    float pos_n = static_cast<float>(w) + 0.5f + static_cast<float>(sign) * 0.5f;
+
+                    if (ao[0] + ao[2] > ao[1] + ao[3]) {
+                        indices.push_back(vertexCount);
+                        indices.push_back(vertexCount + 1);
+                        indices.push_back(vertexCount + 3);
+                        indices.push_back(vertexCount + 1);
+                        indices.push_back(vertexCount + 2);
+                        indices.push_back(vertexCount + 3);
+                    }
+                    else {
+                        indices.push_back(vertexCount);
+                        indices.push_back(vertexCount + 1);
+                        indices.push_back(vertexCount + 2);
+                        indices.push_back(vertexCount + 2);
+                        indices.push_back(vertexCount + 3);
+                        indices.push_back(vertexCount);
+                    }
+                    vertexCount += 4;
+
+                    for (int hh = 0; hh < quadH; ++hh) {
+                        for (int ww = 0; ww < quadW; ++ww) {
+                            mask[i + ww][j + hh] = 1;
                         }
                     }
-                }
 
-                for (int v = 0; v < CHUNK_DEPTH; ++v) {
-                    for (int u = 0; u < CHUNK_WIDTH; ++u) {
-                        if (!sliceData[u + v * CHUNK_WIDTH].visible) continue;
-
-                        FaceInfo currentFace = sliceData[u + v * CHUNK_WIDTH];
-
-                        int width = 1;
-                        while (u + width < CHUNK_WIDTH && sliceData[u + width + v * CHUNK_WIDTH] == currentFace) {
-                            width++;
-                        }
-
-                        int height = 1;
-                        bool done = false;
-                        for (int h = 1; v + h < CHUNK_DEPTH; ++h) {
-                            for (int w = 0; w < width; ++w) {
-                                if (!(sliceData[u + w + (v + h) * CHUNK_WIDTH] == currentFace)) { done = true; break; }
-                            }
-                            if (!done) height++; else break;
-                        }
-
-                        for (int h = 0; h < height; ++h) {
-                            for (int w = 0; w < width; ++w) {
-                                sliceData[u + w + (v + h) * CHUNK_WIDTH].visible = false;
-                            }
-                        }
-
-                        const BlockData& blockData = BlockDataManager::getData(currentFace.blockID);
-                        glm::ivec2 texCoords = blockData.faces[faceIndex].tex_coords;
-
-                        float u_min = texCoords.x * TILE_WIDTH_NORMALIZED;
-                        float v_min = texCoords.y * TILE_HEIGHT_NORMALIZED;
-
-                        float ao[4];
-                        int corner_blocks[4][3];
-                        corner_blocks[0][axis] = d; corner_blocks[0][u_axis] = u; corner_blocks[0][v_axis] = v;
-                        corner_blocks[1][axis] = d; corner_blocks[1][u_axis] = u + width - 1; corner_blocks[1][v_axis] = v;
-                        corner_blocks[2][axis] = d; corner_blocks[2][u_axis] = u + width - 1; corner_blocks[2][v_axis] = v + height - 1;
-                        corner_blocks[3][axis] = d; corner_blocks[3][u_axis] = u; corner_blocks[3][v_axis] = v + height - 1;
-
-                        int canonical_indices[] = { 0, 1, 2, 3 };
-
-                        for (int i = 0; i < 4; ++i) {
-                            bool s1 = data.getBlock(corner_blocks[i][0] + aoCheck[faceIndex][canonical_indices[i]][0][0], corner_blocks[i][1] + aoCheck[faceIndex][canonical_indices[i]][0][1], corner_blocks[i][2] + aoCheck[faceIndex][canonical_indices[i]][0][2]) != 0;
-                            bool s2 = data.getBlock(corner_blocks[i][0] + aoCheck[faceIndex][canonical_indices[i]][1][0], corner_blocks[i][1] + aoCheck[faceIndex][canonical_indices[i]][1][1], corner_blocks[i][2] + aoCheck[faceIndex][canonical_indices[i]][1][2]) != 0;
-                            bool c = data.getBlock(corner_blocks[i][0] + aoCheck[faceIndex][canonical_indices[i]][2][0], corner_blocks[i][1] + aoCheck[faceIndex][canonical_indices[i]][2][1], corner_blocks[i][2] + aoCheck[faceIndex][canonical_indices[i]][2][2]) != 0;
-                            ao[i] = calculateAO(s1, s2, c);
-                        }
-
-                        float quad_pos[3]; quad_pos[axis] = static_cast<float>(d); quad_pos[u_axis] = static_cast<float>(u); quad_pos[v_axis] = static_cast<float>(v);
-                        float du[3] = { 0 }, dv[3] = { 0 }; du[u_axis] = static_cast<float>(width); dv[v_axis] = static_cast<float>(height);
-
-                        float offset = positive ? 0.5f : -0.5f;
-                        float vert[4][3];
-                        for (int i = 0; i < 3; ++i) {
-                            float base = (i == axis) ? (quad_pos[i] + offset) : (quad_pos[i] - 0.5f);
-                            if (i == 0) base += chunkWorldX; else if (i == 1) base += chunkWorldY; else base += chunkWorldZ;
-                            vert[0][i] = base; vert[1][i] = base + du[i]; vert[2][i] = base + du[i] + dv[i]; vert[3][i] = base + dv[i];
-                        }
-
-                        auto push_vert = [&](int vert_idx, float ao_val, float u_tex, float v_tex) {
-                            mesh.vertices.insert(mesh.vertices.end(), { vert[vert_idx][0], vert[vert_idx][1], vert[vert_idx][2], u_tex, v_tex, ao_val, static_cast<float>(currentFace.light) });
-                            };
-
-                        float u_width = TILE_WIDTH_NORMALIZED * width;
-                        float v_height = TILE_HEIGHT_NORMALIZED * height;
-
-                        if (positive) {
-                            push_vert(0, ao[0], u_min, v_min);
-                            push_vert(1, ao[1], u_min + u_width, v_min);
-                            push_vert(2, ao[2], u_min + u_width, v_min + v_height);
-                            push_vert(3, ao[3], u_min, v_min + v_height);
-                        }
-                        else {
-                            push_vert(0, ao[0], u_min, v_min);
-                            push_vert(3, ao[3], u_min, v_min + v_height);
-                            push_vert(2, ao[2], u_min + u_width, v_min + v_height);
-                            push_vert(1, ao[1], u_min + u_width, v_min);
-                        }
-
-                        if (ao[0] + ao[2] > ao[1] + ao[3]) {
-                            mesh.indices.insert(mesh.indices.end(), { vertexCount + 0, vertexCount + 1, vertexCount + 3, vertexCount + 1, vertexCount + 2, vertexCount + 3 });
-                        }
-                        else {
-                            mesh.indices.insert(mesh.indices.end(), { vertexCount + 0, vertexCount + 1, vertexCount + 2, vertexCount + 2, vertexCount + 3, vertexCount + 0 });
-                        }
-                        vertexCount += 4;
-                    }
+                    i += quadW;
                 }
             }
         }
     }
+
+    mesh.vertices = std::move(vertices);
+    mesh.indices = std::move(indices);
 }
