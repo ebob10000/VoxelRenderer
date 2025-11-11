@@ -43,3 +43,7 @@ void Chunk::setLight(int x, int y, int z, unsigned char lightLevel) {
     }
     lightLevels[x][y][z] = lightLevel;
 }
+
+void Chunk::setLightLevels(const unsigned char* data) {
+    std::memcpy(lightLevels, data, sizeof(lightLevels));
+}

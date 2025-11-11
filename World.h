@@ -12,6 +12,7 @@
 #include "TerrainGenerator.h"
 #include "ThreadSafeQueue.h"
 #include "Mesher.h"
+#include "Block.h"
 
 struct ivec3_comp {
     bool operator()(const glm::ivec3& a, const glm::ivec3& b) const {
@@ -25,6 +26,7 @@ struct MeshData {
     glm::ivec3 chunkPosition;
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
+    std::unique_ptr<unsigned char[]> lightLevels;
 };
 
 struct ChunkGenerationData {
@@ -48,6 +50,7 @@ public:
     void update(const glm::vec3& playerPosition);
     int render(Shader& shader, const Frustum& frustum);
     unsigned char getBlock(int x, int y, int z) const;
+    void setBlock(int x, int y, int z, BlockID blockId);
     unsigned char getLight(int x, int y, int z) const;
     size_t getChunkCount() const;
     void forceReload();
@@ -58,7 +61,7 @@ private:
     void buildDirtyChunks();
     void processFinishedMeshes();
     void workerLoop();
-    void calculateSunlight(Chunk& chunk);
+    void calculateSunlight(const unsigned char* blocks, unsigned char* outLight, const glm::ivec3& chunkPos);
 
     std::map<glm::ivec3, std::shared_ptr<Chunk>, ivec3_comp> m_Chunks;
     std::unique_ptr<TerrainGenerator> m_TerrainGenerator;

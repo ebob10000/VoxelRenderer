@@ -148,6 +148,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesher.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="Ray.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="World.cpp" />
   </ItemGroup>
@@ -173,11 +174,20 @@
     <ClInclude Include="Mesher.h" />
     <ClInclude Include="MeshItem.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="Ray.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="TerrainGenerator.h" />
     <ClInclude Include="ThreadSafeQueue.h" />
     <ClInclude Include="World.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="outline.frag" />
+    <None Include="outline.vert" />
+    <None Include="shaders\ui.frag" />
+    <None Include="shaders\ui.vert" />
+    <None Include="shaders\world.frag" />
+    <None Include="shaders\world.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

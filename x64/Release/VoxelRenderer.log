@@ -1,8 +1,14 @@
-﻿  Player.cpp
+﻿  Application.cpp
+  Chunk.cpp
+  Mesher.cpp
+  Player.cpp
+  Ray.cpp
+  World.cpp
+  main.cpp
   Generating code
-  3 of 3507 functions (<0.1%) were compiled, the rest were copied from previous compilation.
+  16 of 3579 functions ( 0.4%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    45 functions had inline decision re-evaluated but remain unchanged
+    51 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
   VoxelRenderer.vcxproj -> C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
   'pwsh.exe' is not recognized as an internal or external command,

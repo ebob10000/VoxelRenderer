@@ -14,7 +14,7 @@ const int PADDED_DEPTH = CHUNK_DEPTH + 2;
 
 class ChunkMeshingData {
 public:
-    ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos);
+    ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos, const unsigned char* centralBlockData, const unsigned char* centralLightData);
 
     unsigned char getBlock(int x, int y, int z) const;
     unsigned char getLight(int x, int y, int z) const;

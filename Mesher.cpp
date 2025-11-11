@@ -11,7 +11,7 @@ const float ATLAS_HEIGHT_TILES = 16.0f;
 const float TILE_WIDTH_NORMALIZED = 1.0f / ATLAS_WIDTH_TILES;
 const float TILE_HEIGHT_NORMALIZED = 1.0f / ATLAS_HEIGHT_TILES;
 
-ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos) {
+ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos, const unsigned char* centralBlockData, const unsigned char* centralLightData) {
     std::array<std::shared_ptr<const Chunk>, 9> neighbors{};
     {
         std::shared_lock<std::shared_mutex> lock(world.m_ChunksMutex);
@@ -28,13 +28,14 @@ ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkP
         }
     }
 
-    if (neighbors[4]) {
-        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-            for (int z = 0; z < CHUNK_DEPTH; ++z) {
-                for (int x = 0; x < CHUNK_WIDTH; ++x) {
-                    m_Blocks[x + 1][y][z + 1] = neighbors[4]->getBlock(x, y, z);
-                    m_LightLevels[x + 1][y][z + 1] = neighbors[4]->getLight(x, y, z);
-                }
+    const unsigned char(*blocks3D)[CHUNK_HEIGHT][CHUNK_DEPTH] = (const unsigned char(*)[CHUNK_HEIGHT][CHUNK_DEPTH])centralBlockData;
+    const unsigned char(*lights3D)[CHUNK_HEIGHT][CHUNK_DEPTH] = (const unsigned char(*)[CHUNK_HEIGHT][CHUNK_DEPTH])centralLightData;
+
+    for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+        for (int z = 0; z < CHUNK_DEPTH; ++z) {
+            for (int x = 0; x < CHUNK_WIDTH; ++x) {
+                m_Blocks[x + 1][y][z + 1] = blocks3D[x][y][z];
+                m_LightLevels[x + 1][y][z + 1] = lights3D[x][y][z];
             }
         }
     }
@@ -171,21 +172,14 @@ void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
         for (int x = 0; x < CHUNK_WIDTH; x++) {
             for (int z = 0; z < CHUNK_DEPTH; z++) {
                 BlockID currentBlock = (BlockID)data.getBlock(x, y, z);
-                if (currentBlock != BlockID::Air) continue;
+                if (currentBlock == BlockID::Air) continue;
 
-                auto checkNeighbor = [&](int nx, int ny, int nz, int face) {
-                    BlockID neighborID = (BlockID)data.getBlock(nx, ny, nz);
-                    if (neighborID != BlockID::Air) {
-                        addFace(nx, ny, nz, face);
-                    }
-                    };
-
-                checkNeighbor(x - 1, y, z, 1);
-                checkNeighbor(x + 1, y, z, 0);
-                checkNeighbor(x, y - 1, z, 3);
-                checkNeighbor(x, y + 1, z, 2);
-                checkNeighbor(x, y, z - 1, 5);
-                checkNeighbor(x, y, z + 1, 4);
+                if ((BlockID)data.getBlock(x + 1, y, z) == BlockID::Air) addFace(x, y, z, 1);
+                if ((BlockID)data.getBlock(x - 1, y, z) == BlockID::Air) addFace(x, y, z, 0);
+                if ((BlockID)data.getBlock(x, y + 1, z) == BlockID::Air) addFace(x, y, z, 3);
+                if ((BlockID)data.getBlock(x, y - 1, z) == BlockID::Air) addFace(x, y, z, 2);
+                if ((BlockID)data.getBlock(x, y, z + 1) == BlockID::Air) addFace(x, y, z, 5);
+                if ((BlockID)data.getBlock(x, y, z - 1) == BlockID::Air) addFace(x, y, z, 4);
             }
         }
     }
@@ -215,6 +209,8 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
     float chunkWorldY = static_cast<float>(chunkPosition.y * CHUNK_HEIGHT);
     float chunkWorldZ = static_cast<float>(chunkPosition.z * CHUNK_DEPTH);
 
+    int dims[] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_DEPTH };
+
     for (int axis = 0; axis < 3; ++axis) {
         for (int dir = 0; dir < 2; ++dir) {
             bool positive = (dir == 1);
@@ -223,11 +219,15 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
             int u_axis = (axis + 1) % 3;
             int v_axis = (axis + 2) % 3;
 
-            for (int d = 0; d < CHUNK_HEIGHT; ++d) {
-                std::vector<FaceInfo> sliceData(CHUNK_WIDTH * CHUNK_DEPTH);
+            int D = dims[axis];
+            int U = dims[u_axis];
+            int V = dims[v_axis];
 
-                for (int u = 0; u < CHUNK_WIDTH; ++u) {
-                    for (int v = 0; v < CHUNK_DEPTH; ++v) {
+            for (int d = 0; d < D; ++d) {
+                std::vector<FaceInfo> sliceData(U * V);
+
+                for (int u = 0; u < U; ++u) {
+                    for (int v = 0; v < V; ++v) {
                         int pos[3];
                         pos[axis] = d; pos[u_axis] = u; pos[v_axis] = v;
 
@@ -237,7 +237,7 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                         BlockID neighborBlock = (BlockID)data.getBlock(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]);
 
                         if (currentBlock != BlockID::Air && neighborBlock == BlockID::Air) {
-                            FaceInfo& info = sliceData[u + v * CHUNK_WIDTH];
+                            FaceInfo& info = sliceData[u + v * U];
                             info.visible = true;
                             info.blockID = currentBlock;
                             info.light = data.getLight(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]);
@@ -245,29 +245,29 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                     }
                 }
 
-                for (int v = 0; v < CHUNK_DEPTH; ++v) {
-                    for (int u = 0; u < CHUNK_WIDTH; ++u) {
-                        if (!sliceData[u + v * CHUNK_WIDTH].visible) continue;
+                for (int v = 0; v < V; ++v) {
+                    for (int u = 0; u < U; ++u) {
+                        if (!sliceData[u + v * U].visible) continue;
 
-                        FaceInfo currentFace = sliceData[u + v * CHUNK_WIDTH];
+                        FaceInfo currentFace = sliceData[u + v * U];
 
                         int width = 1;
-                        while (u + width < CHUNK_WIDTH && sliceData[u + width + v * CHUNK_WIDTH] == currentFace) {
+                        while (u + width < U && sliceData[u + width + v * U] == currentFace) {
                             width++;
                         }
 
                         int height = 1;
                         bool done = false;
-                        for (int h = 1; v + h < CHUNK_DEPTH; ++h) {
+                        for (int h = 1; v + h < V; ++h) {
                             for (int w = 0; w < width; ++w) {
-                                if (!(sliceData[u + w + (v + h) * CHUNK_WIDTH] == currentFace)) { done = true; break; }
+                                if (!(sliceData[u + w + (v + h) * U] == currentFace)) { done = true; break; }
                             }
                             if (!done) height++; else break;
                         }
 
                         for (int h = 0; h < height; ++h) {
                             for (int w = 0; w < width; ++w) {
-                                sliceData[u + w + (v + h) * CHUNK_WIDTH].visible = false;
+                                sliceData[u + w + (v + h) * U].visible = false;
                             }
                         }
 

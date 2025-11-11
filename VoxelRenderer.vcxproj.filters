@@ -16,6 +16,9 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{a661f0e8-f182-4209-be1c-817d03d68be0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{5ef4ff47-759c-4283-a972-a7c87ecae4cf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -55,6 +58,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Player.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Ray.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -137,5 +143,28 @@
     <ClInclude Include="Player.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Ray.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\ui.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\ui.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\world.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\world.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="outline.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="outline.vert">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

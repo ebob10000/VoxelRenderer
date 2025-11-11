@@ -15,6 +15,7 @@ public:
     const glm::ivec3 m_Position;
     std::unique_ptr<Mesh> m_Mesh;
     unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
+    bool m_HasBeenMeshed = false;
 
     Chunk(int x, int y, int z);
 
@@ -28,6 +29,7 @@ public:
 
     unsigned char getLight(int x, int y, int z) const;
     void setLight(int x, int y, int z, unsigned char lightLevel);
+    void setLightLevels(const unsigned char* data);
 
 private:
     unsigned char lightLevels[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };

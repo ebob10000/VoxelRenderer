@@ -1,9 +1,12 @@
 #include "Application.h"
 #include "Frustum.h"
+#include "Ray.h"
+#include "Block.h"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <string>
 #include <cstdio>
+#include <optional>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -30,6 +33,9 @@ Application::Application() {
     glfwSetCursorPosCallback(m_Window, [](GLFWwindow* w, double x, double y) {
         static_cast<Application*>(glfwGetWindowUserPointer(w))->mouse_callback(w, x, y);
         });
+    glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* w, int b, int a, int m) {
+        static_cast<Application*>(glfwGetWindowUserPointer(w))->mouse_button_callback(w, b, a, m);
+        });
     glfwSetScrollCallback(m_Window, [](GLFWwindow* w, double x, double y) {
         static_cast<Application*>(glfwGetWindowUserPointer(w))->scroll_callback(w, x, y);
         });
@@ -49,6 +55,7 @@ Application::Application() {
 
     m_WorldShader = std::make_unique<Shader>("shaders/world.vert", "shaders/world.frag");
     m_UiShader = std::make_unique<Shader>("shaders/ui.vert", "shaders/ui.frag");
+    m_OutlineShader = std::make_unique<Shader>("shaders/outline.vert", "shaders/outline.frag");
 
     glGenTextures(1, &m_TextureID);
     glBindTexture(GL_TEXTURE_2D, m_TextureID);
@@ -71,23 +78,17 @@ Application::Application() {
     stbi_image_free(data);
     applyTextureSettings();
 
-    // Create world first
+    initCrosshair();
+    initOutline();
+
     m_World = std::make_unique<World>();
 
-    // Create player at a temporary safe position high up
     glm::vec3 tempPos(8.5f, 100.0f, 8.5f);
     m_Player = std::make_unique<Player>(tempPos);
 
-    // Trigger initial chunk generation around spawn
     m_World->update(tempPos);
-
-    // Wait for initial chunks to generate and mesh
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-    // Process any finished meshes
     m_World->update(tempPos);
-
-    // Now find the proper spawn position
     findSpawnPosition();
 }
 
@@ -96,8 +97,64 @@ Application::~Application() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
+    glDeleteVertexArrays(1, &m_CrosshairVAO);
+    glDeleteBuffers(1, &m_CrosshairVBO);
+    glDeleteVertexArrays(1, &m_OutlineVAO);
+    glDeleteBuffers(1, &m_OutlineVBO);
+    glDeleteBuffers(1, &m_OutlineEBO);
+
     glfwDestroyWindow(m_Window);
     glfwTerminate();
+}
+
+void Application::initCrosshair() {
+    float crosshairVertices[] = {
+        -10.f,  0.0f,  10.f,  0.0f,
+         0.0f, -10.f,  0.0f,  10.f
+    };
+
+    glGenVertexArrays(1, &m_CrosshairVAO);
+    glGenBuffers(1, &m_CrosshairVBO);
+    glBindVertexArray(m_CrosshairVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_CrosshairVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(crosshairVertices), crosshairVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+}
+
+void Application::initOutline() {
+    const float s = 0.502f;
+    const float outlineVertices[] = {
+        -s, -s, -s,
+         s, -s, -s,
+         s,  s, -s,
+        -s,  s, -s,
+        -s, -s,  s,
+         s, -s,  s,
+         s,  s,  s,
+        -s,  s,  s
+    };
+
+    const unsigned int outlineIndices[] = {
+        0, 1, 1, 2, 2, 3, 3, 0,
+        4, 5, 5, 6, 6, 7, 7, 4,
+        0, 4, 1, 5, 2, 6, 3, 7
+    };
+
+    glGenVertexArrays(1, &m_OutlineVAO);
+    glGenBuffers(1, &m_OutlineVBO);
+    glGenBuffers(1, &m_OutlineEBO);
+
+    glBindVertexArray(m_OutlineVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_OutlineVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(outlineVertices), outlineVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_OutlineEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(outlineIndices), outlineIndices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
 }
 
 void Application::initImGui() {
@@ -155,10 +212,18 @@ void Application::processInput() {
 }
 
 void Application::update() {
-    if (m_IsPaused) return;
+    if (m_IsPaused) {
+        m_HighlightedBlock.reset();
+        return;
+    }
 
     m_Player->update(m_DeltaTime, *m_World, m_Window);
     m_World->update(m_Player->getPosition());
+
+    glm::vec3 rayOrigin = m_Player->getRenderPosition();
+    glm::vec3 rayDir = m_Player->getCamera().front;
+
+    m_HighlightedBlock = raycast(rayOrigin, rayDir, *m_World, 6.0f);
 }
 
 void Application::render() {
@@ -184,11 +249,7 @@ void Application::render() {
         1000.0f
     );
 
-    glm::mat4 view = glm::lookAt(
-        m_Player->getRenderPosition(),
-        m_Player->getRenderPosition() + m_Player->getCamera().front,
-        m_Player->getCamera().up
-    );
+    glm::mat4 view = m_Player->getCamera().getViewMatrix();
 
     m_WorldShader->setMat4("projection", projection);
     m_WorldShader->setMat4("view", view);
@@ -197,8 +258,60 @@ void Application::render() {
     m_Frustum.update(projection * view);
     m_RenderedChunks = m_World->render(*m_WorldShader, m_Frustum);
 
+    renderOutline(projection, view);
+    renderCrosshair();
+
     renderDebugOverlay();
     renderImGui();
+}
+
+void Application::renderOutline(const glm::mat4& projection, const glm::mat4& view) {
+    if (!m_HighlightedBlock.has_value()) return;
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+
+    m_OutlineShader->use();
+
+    glm::vec3 pos = m_HighlightedBlock->blockPosition;
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(pos.x + 0.5f, pos.y + 0.5f, pos.z + 0.5f));
+
+    m_OutlineShader->setMat4("projection", projection);
+    m_OutlineShader->setMat4("view", view);
+    m_OutlineShader->setMat4("model", model);
+
+    glBindVertexArray(m_OutlineVAO);
+    glLineWidth(3.5f);
+    glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
+    glLineWidth(1.0f);
+    glBindVertexArray(0);
+
+    glEnable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
+}
+
+void Application::renderCrosshair() {
+    if (m_IsPaused) return;
+
+    glDisable(GL_DEPTH_TEST);
+    m_UiShader->use();
+    m_UiShader->setVec3("color", glm::vec3(1.0f, 1.0f, 1.0f));
+
+    int width, height;
+    glfwGetFramebufferSize(m_Window, &width, &height);
+    glm::mat4 projection = glm::ortho(0.0f, (float)width, 0.0f, (float)height);
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(width / 2.0f, height / 2.0f, 0.0f));
+
+    m_UiShader->setMat4("projection", projection);
+    m_UiShader->setMat4("model", model);
+
+    glBindVertexArray(m_CrosshairVAO);
+    glLineWidth(2.0f);
+    glDrawArrays(GL_LINES, 0, 4);
+    glLineWidth(1.0f);
+    glBindVertexArray(0);
+
+    glEnable(GL_DEPTH_TEST);
 }
 
 void Application::renderDebugOverlay() {
@@ -220,6 +333,12 @@ void Application::renderDebugOverlay() {
         ImGui::Separator();
         ImGui::Text("Position: (%.1f, %.1f, %.1f)",
             m_Player->getPosition().x, m_Player->getPosition().y, m_Player->getPosition().z);
+        if (m_HighlightedBlock.has_value()) {
+            ImGui::Text("Target: (%d, %d, %d)", m_HighlightedBlock->blockPosition.x, m_HighlightedBlock->blockPosition.y, m_HighlightedBlock->blockPosition.z);
+        }
+        else {
+            ImGui::Text("Target: None");
+        }
         ImGui::Text("On Ground: %s", m_Player->isOnGround() ? "Yes" : "No");
         ImGui::Text("Sprinting: %s", m_Player->isSprinting() ? "Yes" : "No");
         ImGui::Text("Sneaking: %s", m_Player->isSneaking() ? "Yes" : "No");
@@ -257,7 +376,6 @@ void Application::renderImGui() {
         }
 
         ImGui::Separator();
-        // FIX: Store isFlying in temp variable to get addressable l-value
         bool isFlying = m_Player->isFlying();
         if (ImGui::Checkbox("Flying Mode", &isFlying)) {
             m_Player->setFlying(isFlying);
@@ -324,6 +442,23 @@ void Application::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     m_Player->getCamera().updateCameraVectors();
 }
 
+void Application::mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse || m_IsPaused) return;
+
+    if (m_HighlightedBlock.has_value() && action == GLFW_PRESS) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT) { // Break block
+            const auto& result = m_HighlightedBlock.value();
+            m_World->setBlock(result.blockPosition.x, result.blockPosition.y, result.blockPosition.z, BlockID::Air);
+        }
+        else if (button == GLFW_MOUSE_BUTTON_RIGHT) { // Place block
+            const auto& result = m_HighlightedBlock.value();
+            glm::ivec3 placePos = result.blockPosition + result.faceNormal;
+            m_World->setBlock(placePos.x, placePos.y, placePos.z, m_HeldBlock);
+        }
+    }
+}
+
 void Application::scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureMouse) return;
@@ -357,18 +492,15 @@ void Application::findSpawnPosition() {
     float spawnX = 8.5f;
     float spawnZ = 8.5f;
 
-    // Find the highest solid block at spawn coordinates
     int spawnY = CHUNK_HEIGHT - 1;
     for (int y = CHUNK_HEIGHT - 1; y >= 0; --y) {
         if (m_World->getBlock((int)spawnX, y, (int)spawnZ) != 0) {
-            spawnY = y + 1; // Spawn one block above the solid block
+            spawnY = y + 1;
             break;
         }
     }
 
-    // If no solid block found, use a default height
     if (spawnY == CHUNK_HEIGHT - 1) {
-        // Use noise to calculate terrain height as fallback
         FastNoiseLite noise;
         noise.SetSeed(1337);
         noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
@@ -382,11 +514,7 @@ void Application::findSpawnPosition() {
         spawnY = static_cast<int>(((noiseValue + 1.0f) / 2.0f) * (CHUNK_HEIGHT - 10) + 5);
     }
 
-    // Create final spawn position with eye height
     glm::vec3 spawnPos(spawnX, spawnY + Physics::EYE_HEIGHT, spawnZ);
-
-    // Recreate player at correct position
     m_Player = std::make_unique<Player>(spawnPos);
-
     std::cout << "Player spawned at: (" << spawnPos.x << ", " << spawnPos.y << ", " << spawnPos.z << ")" << std::endl;
 }
