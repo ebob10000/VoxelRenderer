@@ -143,6 +143,11 @@ void World::processFinishedMeshes() {
             it->second->m_Mesh->indices = std::move(finishedMesh.indices);
             it->second->m_Mesh->upload();
         }
+
+        {
+            std::lock_guard<std::mutex> lock(m_MeshingJobsMutex);
+            m_MeshingJobs.erase(finishedMesh.chunkPosition);
+        }
     }
 }
 
@@ -153,27 +158,18 @@ void World::workerLoop() {
 
         if (!m_IsRunning) break;
 
-        // The critical optimization: gather all necessary chunk data ONCE with a single lock.
         ChunkMeshingData dataProvider(*this, jobData.position);
 
         IMesher* mesher = m_UseGreedyMesher ? (IMesher*)m_GreedyMesher.get() : (IMesher*)m_SimpleMesher.get();
 
         Mesh tempMesh;
-        // The mesher now operates on the fast, local data with no connection to the World.
         mesher->generateMesh(dataProvider, jobData.position, tempMesh);
 
-        if (!tempMesh.vertices.empty()) {
-            MeshData meshData;
-            meshData.chunkPosition = jobData.position;
-            meshData.vertices = std::move(tempMesh.vertices);
-            meshData.indices = std::move(tempMesh.indices);
-            m_FinishedMeshesQueue.push(std::move(meshData));
-        }
-
-        {
-            std::lock_guard<std::mutex> lock(m_MeshingJobsMutex);
-            m_MeshingJobs.erase(jobData.position);
-        }
+        MeshData meshData;
+        meshData.chunkPosition = jobData.position;
+        meshData.vertices = std::move(tempMesh.vertices);
+        meshData.indices = std::move(tempMesh.indices);
+        m_FinishedMeshesQueue.push(std::move(meshData));
     }
 }
 

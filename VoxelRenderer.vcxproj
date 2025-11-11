@@ -147,6 +147,7 @@
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesher.cpp" />
+    <ClCompile Include="Player.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="World.cpp" />
   </ItemGroup>
@@ -155,6 +156,7 @@
     <ClInclude Include="Block.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Chunk.h" />
+    <ClInclude Include="ChunkGenerationData.h" />
     <ClInclude Include="FaceData.h" />
     <ClInclude Include="FastNoiseLite.h" />
     <ClInclude Include="Frustum.h" />
@@ -170,6 +172,7 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Mesher.h" />
     <ClInclude Include="MeshItem.h" />
+    <ClInclude Include="Player.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="TerrainGenerator.h" />

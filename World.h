@@ -60,7 +60,7 @@ private:
     void workerLoop();
     void calculateSunlight(Chunk& chunk);
 
-    std::map<glm::ivec3, std::shared_ptr<Chunk>, ivec3_comp> m_Chunks; 
+    std::map<glm::ivec3, std::shared_ptr<Chunk>, ivec3_comp> m_Chunks;
     std::unique_ptr<TerrainGenerator> m_TerrainGenerator;
     std::unique_ptr<SimpleMesher> m_SimpleMesher;
     std::unique_ptr<GreedyMesher> m_GreedyMesher;

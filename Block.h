@@ -29,21 +29,23 @@ public:
     }
 
 private:
-    // THE FIX: These coordinates now match the vertically-flipped atlas in memory.
+    // The texture atlas is loaded flipped vertically, so the Y-coordinate needs to be inverted.
+    // The atlas is 16x16 tiles. The artist's top row (Y=0) is Y=15 in our texture coordinates.
+    // Textures from left to right: Grass Top (0), Grass Side (1), Dirt (2), Stone (3)
     static const inline std::map<BlockID, BlockData> m_BlockDataMap = {
         { BlockID::Stone, { BlockID::Stone, {
-            { {1, 0} }, { {1, 0} }, { {1, 0} }, { {1, 0} }, { {1, 0} }, { {1, 0} }
+            { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }
         }}},
         { BlockID::Dirt, { BlockID::Dirt, {
-            { {0, 0} }, { {0, 0} }, { {0, 0} }, { {0, 0} }, { {0, 0} }, { {0, 0} }
+            { {2, 15} }, { {2, 15} }, { {2, 15} }, { {2, 15} }, { {2, 15} }, { {2, 15} }
         }}},
         { BlockID::Grass, { BlockID::Grass, {
-            { {1, 1} }, // -X (Side is Grass Side)
-            { {1, 1} }, // +X (Side is Grass Side)
-            { {0, 0} }, // -Y (Bottom is Dirt)
-            { {0, 1} }, // +Y (Top is Grass Top)
-            { {1, 1} }, // -Z (Side is Grass Side)
-            { {1, 1} }  // +Z (Side is Grass Side)
+            { {1, 15} }, // -X (Side is Grass Side)
+            { {1, 15} }, // +X (Side is Grass Side)
+            { {2, 15} }, // -Y (Bottom is Dirt)
+            { {0, 15} }, // +Y (Top is Grass Top)
+            { {1, 15} }, // -Z (Side is Grass Side)
+            { {1, 15} }  // +Z (Side is Grass Side)
         }}}
     };
 };

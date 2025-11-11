@@ -19,6 +19,33 @@ struct Mesh {
         glDeleteBuffers(1, &EBO);
     }
 
+    Mesh(const Mesh&) = delete;
+    Mesh& operator=(const Mesh&) = delete;
+
+    Mesh(Mesh&& other) noexcept :
+        VAO(other.VAO), VBO(other.VBO), EBO(other.EBO),
+        vertices(std::move(other.vertices)), indices(std::move(other.indices)) {
+        other.VAO = 0; other.VBO = 0; other.EBO = 0;
+    }
+
+    Mesh& operator=(Mesh&& other) noexcept {
+        if (this != &other) {
+            glDeleteVertexArrays(1, &VAO);
+            glDeleteBuffers(1, &VBO);
+            glDeleteBuffers(1, &EBO);
+
+            VAO = other.VAO;
+            VBO = other.VBO;
+            EBO = other.EBO;
+            vertices = std::move(other.vertices);
+            indices = std::move(other.indices);
+
+            other.VAO = 0; other.VBO = 0; other.EBO = 0;
+        }
+        return *this;
+    }
+
+
     void upload() {
         if (vertices.empty()) return;
 
@@ -29,16 +56,12 @@ struct Mesh {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_DYNAMIC_DRAW);
 
         GLsizei stride = 7 * sizeof(float);
-        // Position
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
         glEnableVertexAttribArray(0);
-        // Tex Coords
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
-        // AO
         glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
         glEnableVertexAttribArray(2);
-        // Light
         glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
         glEnableVertexAttribArray(3);
 
