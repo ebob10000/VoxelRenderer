@@ -2,36 +2,36 @@
 #include <glm/glm.hpp>
 #include <map>
 
-// Using an enum makes block IDs clear and type-safe.
 enum class BlockID : unsigned char {
     Air = 0,
     Stone = 1,
     Dirt = 2,
-    Grass = 3
+    Grass = 3,
+    Glowstone = 4
 };
 
-// Stores the texture coordinates (in tile units) for one face of a block.
 struct BlockFace {
     glm::ivec2 tex_coords;
 };
 
-// Defines all properties for a single type of block.
 struct BlockData {
     BlockID id;
     BlockFace faces[6]; // 0: -X, 1: +X, 2: -Y, 3: +Y, 4: -Z, 5: +Z
+    unsigned char emissionStrength = 0;
 };
 
-// A static class to manage all block definitions.
 class BlockDataManager {
 public:
     static inline const BlockData& getData(BlockID id) {
+        if (id == BlockID::Air) {
+            static const BlockData airData = { BlockID::Air };
+            return airData;
+        }
         return m_BlockDataMap.at(id);
     }
 
 private:
-    // The texture atlas is loaded flipped vertically, so the Y-coordinate needs to be inverted.
-    // The atlas is 16x16 tiles. The artist's top row (Y=0) is Y=15 in our texture coordinates.
-    // Textures from left to right: Grass Top (0), Grass Side (1), Dirt (2), Stone (3)
+    // Textures from left to right: Grass Top (0), Grass Side (1), Dirt (2), Stone (3), Glowstone (9)
     static const inline std::map<BlockID, BlockData> m_BlockDataMap = {
         { BlockID::Stone, { BlockID::Stone, {
             { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }
@@ -46,6 +46,9 @@ private:
             { {0, 15} }, // +Y (Top is Grass Top)
             { {1, 15} }, // -Z (Side is Grass Side)
             { {1, 15} }  // +Z (Side is Grass Side)
-        }}}
+        }}},
+        { BlockID::Glowstone, { BlockID::Glowstone, {
+            { {9, 15} }, { {9, 15} }, { {9, 15} }, { {9, 15} }, { {9, 15} }, { {9, 15} }
+        }, 15}}
     };
 };

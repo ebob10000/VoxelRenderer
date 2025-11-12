@@ -14,10 +14,11 @@ const int PADDED_DEPTH = CHUNK_DEPTH + 2;
 
 class ChunkMeshingData {
 public:
-    ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos, const unsigned char* centralBlockData, const unsigned char* centralLightData);
+    ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos);
 
     unsigned char getBlock(int x, int y, int z) const;
-    unsigned char getLight(int x, int y, int z) const;
+    unsigned char getSunlight(int x, int y, int z) const;
+    unsigned char getBlockLight(int x, int y, int z) const;
 
 private:
     unsigned char m_Blocks[PADDED_WIDTH][PADDED_HEIGHT][PADDED_DEPTH] = { 0 };
@@ -26,15 +27,15 @@ private:
 
 class IMesher {
 public:
-    virtual void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) = 0;
+    virtual void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) = 0;
 };
 
 class SimpleMesher : public IMesher {
 public:
-    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) override;
+    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) override;
 };
 
 class GreedyMesher : public IMesher {
 public:
-    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) override;
+    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) override;
 };

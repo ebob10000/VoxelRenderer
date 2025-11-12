@@ -26,11 +26,17 @@ struct MeshData {
     glm::ivec3 chunkPosition;
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
-    std::unique_ptr<unsigned char[]> lightLevels;
 };
 
-struct ChunkGenerationData {
-    glm::ivec3 position;
+struct LightUpdateNode {
+    glm::ivec3 pos;
+    unsigned char level;
+};
+
+struct LightUpdateJob {
+    glm::ivec3 pos;
+    BlockID oldBlock;
+    BlockID newBlock;
 };
 
 class ChunkMeshingData;
@@ -42,8 +48,8 @@ class World {
 public:
     int m_RenderDistance = 12;
     bool m_UseGreedyMesher = false;
-    bool m_UseAO = true;
     bool m_UseSunlight = true;
+    bool m_SmoothLighting = true;
 
     World();
     ~World();
@@ -51,7 +57,11 @@ public:
     int render(Shader& shader, const Frustum& frustum);
     unsigned char getBlock(int x, int y, int z) const;
     void setBlock(int x, int y, int z, BlockID blockId);
-    unsigned char getLight(int x, int y, int z) const;
+    unsigned char getSunlight(int x, int y, int z) const;
+    void setSunlight(int x, int y, int z, unsigned char level);
+    unsigned char getBlockLight(int x, int y, int z) const;
+    void setBlockLight(int x, int y, int z, unsigned char level);
+
     size_t getChunkCount() const;
     void forceReload();
     void stopThreads();
@@ -60,8 +70,11 @@ private:
     void loadChunks(const glm::ivec3& playerChunkPos);
     void buildDirtyChunks();
     void processFinishedMeshes();
-    void workerLoop();
-    void calculateSunlight(const unsigned char* blocks, unsigned char* outLight, const glm::ivec3& chunkPos);
+    void mesherLoop();
+    void lightingLoop();
+
+    void calculateInitialSunlight(Chunk& chunk);
+    void processLightUpdates(const LightUpdateJob& job);
 
     std::map<glm::ivec3, std::shared_ptr<Chunk>, ivec3_comp> m_Chunks;
     std::unique_ptr<TerrainGenerator> m_TerrainGenerator;
@@ -70,10 +83,16 @@ private:
 
     glm::ivec3 m_LastPlayerChunkPos;
     std::set<glm::ivec3, ivec3_comp> m_DirtyChunks;
+    std::mutex m_DirtyChunksMutex;
 
-    std::vector<std::thread> m_WorkerThreads;
-    ThreadSafeQueue<ChunkGenerationData> m_GenerationQueue;
+    std::vector<std::thread> m_MesherThreads;
+    std::thread m_LightThread;
+
+    ThreadSafeQueue<glm::ivec3> m_MeshingQueue;
     ThreadSafeQueue<MeshData> m_FinishedMeshesQueue;
+    ThreadSafeQueue<LightUpdateJob> m_LightUpdateQueue;
+    ThreadSafeQueue<glm::ivec3> m_InitialLightQueue;
+
     std::atomic<bool> m_IsRunning;
     mutable std::shared_mutex m_ChunksMutex;
 

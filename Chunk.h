@@ -27,10 +27,15 @@ public:
     const unsigned char* getBlocks() const { return &blocks[0][0][0]; }
     void setBlocks(const unsigned char* data);
 
-    unsigned char getLight(int x, int y, int z) const;
-    void setLight(int x, int y, int z, unsigned char lightLevel);
+    unsigned char getSunlight(int x, int y, int z) const;
+    void setSunlight(int x, int y, int z, unsigned char lightLevel);
+
+    unsigned char getBlockLight(int x, int y, int z) const;
+    void setBlockLight(int x, int y, int z, unsigned char lightLevel);
+
     void setLightLevels(const unsigned char* data);
 
 private:
+    // 4 bits for sunlight, 4 bits for block light
     unsigned char lightLevels[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
 };

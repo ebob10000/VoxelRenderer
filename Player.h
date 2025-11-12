@@ -3,6 +3,7 @@
 #include "World.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <utility>
 
 namespace Physics {
     const float TICK_RATE = 20.0f;
@@ -10,7 +11,7 @@ namespace Physics {
 
     const float GRAVITY = 0.08f;
     const float VERTICAL_DRAG = 0.98f;
-    const float JUMP_FORCE = 0.47f;
+    const float JUMP_FORCE = 0.42f;
     const float TERMINAL_VELOCITY = -3.92f;
 
     const float SLIPPERINESS = 0.6f;
@@ -19,13 +20,19 @@ namespace Physics {
     const float BASE_ACCELERATION = 0.18f;
     const float AIR_ACCELERATION = 0.03f;
 
-    const float SPRINT_MULTIPLIER = 1.5f;
+    const float WALK_SPEED = 0.32f;
+    const float SPRINT_SPEED = 0.56f;
+    const float SNEAK_SPEED = 0.2f;
+
+    const float SPRINT_MULTIPLIER = 1.3f;
     const float SNEAK_MULTIPLIER = 0.3f;
     const float SPRINT_JUMP_BOOST = 0.05f;
 
     const float PLAYER_WIDTH = 0.6f;
     const float PLAYER_HEIGHT = 1.8f;
     const float EYE_HEIGHT = 1.6f;
+    const float CROUCH_PLAYER_HEIGHT = 1.5f;
+    const float CROUCH_EYE_HEIGHT = 1.3f;
 }
 
 class Player {
@@ -45,17 +52,17 @@ public:
     bool isFlying() const { return m_IsFlying; }
     void setFlying(bool flying) { m_IsFlying = flying; m_Velocity = glm::vec3(0.0f); }
 
-    float getFOV() const;
+    float getCurrentFOV() const { return m_CurrentFOV; }
+    std::pair<glm::vec3, glm::vec3> getAABB() const;
 
 private:
     void runPhysicsTick(World& world);
     void resolveCollisions(World& world);
-    bool checkGroundCollision(World& world, const glm::vec3& pos);
 
     Camera m_Camera;
-    glm::vec3 m_Position;
+    glm::vec3 m_Position; // Represents the bottom-center of the player's AABB
     glm::vec3 m_Velocity;
-    glm::vec3 m_MoveDirection;
+    glm::vec3 m_MoveInput;
 
     bool m_IsOnGround = false;
     bool m_IsSprinting = false;
@@ -64,8 +71,12 @@ private:
     bool m_JumpInput = false;
     bool m_WasOnGround = false;
     bool m_WasSprintingOnJump = false;
+    bool m_WasSneaking = false;
 
     glm::vec3 m_PreviousPosition;
     glm::vec3 m_RenderPosition;
     float m_TimeAccumulator = 0.0f;
+
+    float m_CurrentFOV;
+    float m_CurrentEyeHeight;
 };

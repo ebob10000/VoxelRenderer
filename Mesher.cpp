@@ -5,13 +5,14 @@
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <algorithm>
 
 const float ATLAS_WIDTH_TILES = 16.0f;
 const float ATLAS_HEIGHT_TILES = 16.0f;
 const float TILE_WIDTH_NORMALIZED = 1.0f / ATLAS_WIDTH_TILES;
 const float TILE_HEIGHT_NORMALIZED = 1.0f / ATLAS_HEIGHT_TILES;
 
-ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos, const unsigned char* centralBlockData, const unsigned char* centralLightData) {
+ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos) {
     std::array<std::shared_ptr<const Chunk>, 9> neighbors{};
     {
         std::shared_lock<std::shared_mutex> lock(world.m_ChunksMutex);
@@ -28,78 +29,91 @@ ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkP
         }
     }
 
-    const unsigned char(*blocks3D)[CHUNK_HEIGHT][CHUNK_DEPTH] = (const unsigned char(*)[CHUNK_HEIGHT][CHUNK_DEPTH])centralBlockData;
-    const unsigned char(*lights3D)[CHUNK_HEIGHT][CHUNK_DEPTH] = (const unsigned char(*)[CHUNK_HEIGHT][CHUNK_DEPTH])centralLightData;
-
-    for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-        for (int z = 0; z < CHUNK_DEPTH; ++z) {
-            for (int x = 0; x < CHUNK_WIDTH; ++x) {
-                m_Blocks[x + 1][y][z + 1] = blocks3D[x][y][z];
-                m_LightLevels[x + 1][y][z + 1] = lights3D[x][y][z];
+    if (neighbors[4]) { // Center chunk
+        const auto& center_chunk = neighbors[4];
+        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+            for (int z = 0; z < CHUNK_DEPTH; ++z) {
+                for (int x = 0; x < CHUNK_WIDTH; ++x) {
+                    m_Blocks[x + 1][y][z + 1] = center_chunk->getBlock(x, y, z);
+                    unsigned char sun = center_chunk->getSunlight(x, y, z);
+                    unsigned char block = center_chunk->getBlockLight(x, y, z);
+                    m_LightLevels[x + 1][y][z + 1] = (sun << 4) | block;
+                }
             }
         }
     }
 
+
+    auto getNeighborLight = [&](const std::shared_ptr<const Chunk>& neighbor, int x, int y, int z) -> unsigned char {
+        if (!neighbor) return (15 << 4); // Full sun if no chunk
+        unsigned char sun = neighbor->getSunlight(x, y, z);
+        unsigned char block = neighbor->getBlockLight(x, y, z);
+        return (sun << 4) | block;
+        };
+
     if (neighbors[3]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int z = 0; z < CHUNK_DEPTH; ++z) {
             m_Blocks[0][y][z + 1] = neighbors[3]->getBlock(CHUNK_WIDTH - 1, y, z);
-            m_LightLevels[0][y][z + 1] = neighbors[3]->getLight(CHUNK_WIDTH - 1, y, z);
+            m_LightLevels[0][y][z + 1] = getNeighborLight(neighbors[3], CHUNK_WIDTH - 1, y, z);
         }
     }
     if (neighbors[5]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int z = 0; z < CHUNK_DEPTH; ++z) {
             m_Blocks[CHUNK_WIDTH + 1][y][z + 1] = neighbors[5]->getBlock(0, y, z);
-            m_LightLevels[CHUNK_WIDTH + 1][y][z + 1] = neighbors[5]->getLight(0, y, z);
+            m_LightLevels[CHUNK_WIDTH + 1][y][z + 1] = getNeighborLight(neighbors[5], 0, y, z);
         }
     }
     if (neighbors[1]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int x = 0; x < CHUNK_WIDTH; ++x) {
             m_Blocks[x + 1][y][0] = neighbors[1]->getBlock(x, y, CHUNK_DEPTH - 1);
-            m_LightLevels[x + 1][y][0] = neighbors[1]->getLight(x, y, CHUNK_DEPTH - 1);
+            m_LightLevels[x + 1][y][0] = getNeighborLight(neighbors[1], x, y, CHUNK_DEPTH - 1);
         }
     }
     if (neighbors[7]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) for (int x = 0; x < CHUNK_WIDTH; ++x) {
             m_Blocks[x + 1][y][CHUNK_DEPTH + 1] = neighbors[7]->getBlock(x, y, 0);
-            m_LightLevels[x + 1][y][CHUNK_DEPTH + 1] = neighbors[7]->getLight(x, y, 0);
+            m_LightLevels[x + 1][y][CHUNK_DEPTH + 1] = getNeighborLight(neighbors[7], x, y, 0);
         }
     }
-
     if (neighbors[0]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) {
             m_Blocks[0][y][0] = neighbors[0]->getBlock(CHUNK_WIDTH - 1, y, CHUNK_DEPTH - 1);
-            m_LightLevels[0][y][0] = neighbors[0]->getLight(CHUNK_WIDTH - 1, y, CHUNK_DEPTH - 1);
+            m_LightLevels[0][y][0] = getNeighborLight(neighbors[0], CHUNK_WIDTH - 1, y, CHUNK_DEPTH - 1);
         }
     }
     if (neighbors[2]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) {
             m_Blocks[CHUNK_WIDTH + 1][y][0] = neighbors[2]->getBlock(0, y, CHUNK_DEPTH - 1);
-            m_LightLevels[CHUNK_WIDTH + 1][y][0] = neighbors[2]->getLight(0, y, CHUNK_DEPTH - 1);
+            m_LightLevels[CHUNK_WIDTH + 1][y][0] = getNeighborLight(neighbors[2], 0, y, CHUNK_DEPTH - 1);
         }
     }
     if (neighbors[6]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) {
             m_Blocks[0][y][CHUNK_DEPTH + 1] = neighbors[6]->getBlock(CHUNK_WIDTH - 1, y, 0);
-            m_LightLevels[0][y][CHUNK_DEPTH + 1] = neighbors[6]->getLight(CHUNK_WIDTH - 1, y, 0);
+            m_LightLevels[0][y][CHUNK_DEPTH + 1] = getNeighborLight(neighbors[6], CHUNK_WIDTH - 1, y, 0);
         }
     }
     if (neighbors[8]) {
         for (int y = 0; y < CHUNK_HEIGHT; ++y) {
             m_Blocks[CHUNK_WIDTH + 1][y][CHUNK_DEPTH + 1] = neighbors[8]->getBlock(0, y, 0);
-            m_LightLevels[CHUNK_WIDTH + 1][y][CHUNK_DEPTH + 1] = neighbors[8]->getLight(0, y, 0);
+            m_LightLevels[CHUNK_WIDTH + 1][y][CHUNK_DEPTH + 1] = getNeighborLight(neighbors[8], 0, y, 0);
         }
     }
 }
-
 
 unsigned char ChunkMeshingData::getBlock(int x, int y, int z) const {
     if (y < 0 || y >= CHUNK_HEIGHT) return 0;
     return m_Blocks[x + 1][y][z + 1];
 }
 
-unsigned char ChunkMeshingData::getLight(int x, int y, int z) const {
+unsigned char ChunkMeshingData::getSunlight(int x, int y, int z) const {
     if (y < 0 || y >= CHUNK_HEIGHT) return 15;
-    return m_LightLevels[x + 1][y][z + 1];
+    return m_LightLevels[x + 1][y][z + 1] >> 4;
+}
+
+unsigned char ChunkMeshingData::getBlockLight(int x, int y, int z) const {
+    if (y < 0 || y >= CHUNK_HEIGHT) return 0;
+    return m_LightLevels[x + 1][y][z + 1] & 0x0F;
 }
 
 namespace {
@@ -111,7 +125,7 @@ namespace {
     }
 }
 
-void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) {
+void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) {
     mesh.vertices.clear();
     mesh.indices.clear();
     unsigned int vertexCount = 0;
@@ -131,7 +145,10 @@ void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
         float u_min = texCoords.x * TILE_WIDTH_NORMALIZED;
         float v_min = texCoords.y * TILE_HEIGHT_NORMALIZED;
 
-        float lightLevel = static_cast<float>(data.getLight(x + faceNormals[faceIndex][0], y + faceNormals[faceIndex][1], z + faceNormals[faceIndex][2]));
+        int nx = x + faceNormals[faceIndex][0];
+        int ny = y + faceNormals[faceIndex][1];
+        int nz = z + faceNormals[faceIndex][2];
+
         float ao[4];
 
         for (int i = 0; i < 4; i++) {
@@ -150,16 +167,53 @@ void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                 atlas_v
                 });
 
-            bool s1 = data.getBlock(x + aoCheck[faceIndex][i][0][0], y + aoCheck[faceIndex][i][0][1], z + aoCheck[faceIndex][i][0][2]) != 0;
-            bool s2 = data.getBlock(x + aoCheck[faceIndex][i][1][0], y + aoCheck[faceIndex][i][1][1], z + aoCheck[faceIndex][i][1][2]) != 0;
-            bool c = data.getBlock(x + aoCheck[faceIndex][i][2][0], y + aoCheck[faceIndex][i][2][1], z + aoCheck[faceIndex][i][2][2]) != 0;
-
-            ao[i] = calculateAO(s1, s2, c);
+            if (smoothLighting) {
+                bool s1 = data.getBlock(x + aoCheck[faceIndex][i][0][0], y + aoCheck[faceIndex][i][0][1], z + aoCheck[faceIndex][i][0][2]) != 0;
+                bool s2 = data.getBlock(x + aoCheck[faceIndex][i][1][0], y + aoCheck[faceIndex][i][1][1], z + aoCheck[faceIndex][i][1][2]) != 0;
+                bool c = data.getBlock(x + aoCheck[faceIndex][i][2][0], y + aoCheck[faceIndex][i][2][1], z + aoCheck[faceIndex][i][2][2]) != 0;
+                ao[i] = calculateAO(s1, s2, c);
+            }
+            else {
+                ao[i] = 0.0f;
+            }
             mesh.vertices.push_back(ao[i]);
-            mesh.vertices.push_back(lightLevel);
+
+            if (smoothLighting) {
+                glm::ivec3 n_main = { nx, ny, nz };
+                glm::ivec3 n_side1 = { x + aoCheck[faceIndex][i][0][0], y + aoCheck[faceIndex][i][0][1], z + aoCheck[faceIndex][i][0][2] };
+                glm::ivec3 n_side2 = { x + aoCheck[faceIndex][i][1][0], y + aoCheck[faceIndex][i][1][1], z + aoCheck[faceIndex][i][1][2] };
+                glm::ivec3 n_corner = { x + aoCheck[faceIndex][i][2][0], y + aoCheck[faceIndex][i][2][1], z + aoCheck[faceIndex][i][2][2] };
+
+                float sun_total = 0;
+                float block_total = 0;
+
+                sun_total += data.getSunlight(n_main.x, n_main.y, n_main.z);
+                block_total += data.getBlockLight(n_main.x, n_main.y, n_main.z);
+                sun_total += data.getSunlight(n_side1.x, n_side1.y, n_side1.z);
+                block_total += data.getBlockLight(n_side1.x, n_side1.y, n_side1.z);
+                sun_total += data.getSunlight(n_side2.x, n_side2.y, n_side2.z);
+                block_total += data.getBlockLight(n_side2.x, n_side2.y, n_side2.z);
+                sun_total += data.getSunlight(n_corner.x, n_corner.y, n_corner.z);
+                block_total += data.getBlockLight(n_corner.x, n_corner.y, n_corner.z);
+
+                float final_light = std::max(sun_total / 4.0f, block_total / 4.0f);
+                if (blockData.emissionStrength > 0) {
+                    final_light = static_cast<float>(blockData.emissionStrength);
+                }
+                mesh.vertices.push_back(final_light);
+            }
+            else {
+                float face_sunlight = static_cast<float>(data.getSunlight(nx, ny, nz));
+                float face_blocklight = static_cast<float>(data.getBlockLight(nx, ny, nz));
+                float lightLevel = std::max(face_sunlight, face_blocklight);
+                if (blockData.emissionStrength > 0) {
+                    lightLevel = static_cast<float>(blockData.emissionStrength);
+                }
+                mesh.vertices.push_back(lightLevel);
+            }
         }
 
-        if (ao[0] + ao[2] > ao[1] + ao[3]) {
+        if (smoothLighting && (ao[0] + ao[2] > ao[1] + ao[3])) {
             mesh.indices.insert(mesh.indices.end(), { vertexCount, vertexCount + 1, vertexCount + 3, vertexCount + 1, vertexCount + 2, vertexCount + 3 });
         }
         else {
@@ -188,16 +242,17 @@ void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
 namespace {
     struct FaceInfo {
         bool visible = false;
-        unsigned char light = 0;
+        unsigned char sunLight = 0;
+        unsigned char blockLight = 0;
         BlockID blockID = BlockID::Air;
 
         bool operator==(const FaceInfo& other) const {
-            return visible == other.visible && light == other.light && blockID == other.blockID;
+            return visible == other.visible && sunLight == other.sunLight && blockLight == other.blockLight && blockID == other.blockID;
         }
     };
 }
 
-void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh) {
+void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) {
     mesh.vertices.clear();
     mesh.indices.clear();
     unsigned int vertexCount = 0;
@@ -232,15 +287,19 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                         pos[axis] = d; pos[u_axis] = u; pos[v_axis] = v;
 
                         int normal[3] = { 0 }; normal[axis] = positive ? 1 : -1;
+                        int nx = pos[0] + normal[0];
+                        int ny = pos[1] + normal[1];
+                        int nz = pos[2] + normal[2];
 
                         BlockID currentBlock = (BlockID)data.getBlock(pos[0], pos[1], pos[2]);
-                        BlockID neighborBlock = (BlockID)data.getBlock(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]);
+                        BlockID neighborBlock = (BlockID)data.getBlock(nx, ny, nz);
 
                         if (currentBlock != BlockID::Air && neighborBlock == BlockID::Air) {
                             FaceInfo& info = sliceData[u + v * U];
                             info.visible = true;
                             info.blockID = currentBlock;
-                            info.light = data.getLight(pos[0] + normal[0], pos[1] + normal[1], pos[2] + normal[2]);
+                            info.sunLight = data.getSunlight(nx, ny, nz);
+                            info.blockLight = data.getBlockLight(nx, ny, nz);
                         }
                     }
                 }
@@ -250,6 +309,7 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                         if (!sliceData[u + v * U].visible) continue;
 
                         FaceInfo currentFace = sliceData[u + v * U];
+                        float lightLevel = std::max((float)currentFace.sunLight, (float)currentFace.blockLight);
 
                         int width = 1;
                         while (u + width < U && sliceData[u + width + v * U] == currentFace) {
@@ -272,26 +332,15 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                         }
 
                         const BlockData& blockData = BlockDataManager::getData(currentFace.blockID);
+                        if (blockData.emissionStrength > 0) {
+                            lightLevel = static_cast<float>(blockData.emissionStrength);
+                        }
                         glm::ivec2 texCoords = blockData.faces[faceIndex].tex_coords;
 
                         float u_min = texCoords.x * TILE_WIDTH_NORMALIZED;
                         float v_min = texCoords.y * TILE_HEIGHT_NORMALIZED;
 
-                        float ao[4];
-                        int corner_blocks[4][3];
-                        corner_blocks[0][axis] = d; corner_blocks[0][u_axis] = u; corner_blocks[0][v_axis] = v;
-                        corner_blocks[1][axis] = d; corner_blocks[1][u_axis] = u + width - 1; corner_blocks[1][v_axis] = v;
-                        corner_blocks[2][axis] = d; corner_blocks[2][u_axis] = u + width - 1; corner_blocks[2][v_axis] = v + height - 1;
-                        corner_blocks[3][axis] = d; corner_blocks[3][u_axis] = u; corner_blocks[3][v_axis] = v + height - 1;
-
-                        int canonical_indices[] = { 0, 1, 2, 3 };
-
-                        for (int i = 0; i < 4; ++i) {
-                            bool s1 = data.getBlock(corner_blocks[i][0] + aoCheck[faceIndex][canonical_indices[i]][0][0], corner_blocks[i][1] + aoCheck[faceIndex][canonical_indices[i]][0][1], corner_blocks[i][2] + aoCheck[faceIndex][canonical_indices[i]][0][2]) != 0;
-                            bool s2 = data.getBlock(corner_blocks[i][0] + aoCheck[faceIndex][canonical_indices[i]][1][0], corner_blocks[i][1] + aoCheck[faceIndex][canonical_indices[i]][1][1], corner_blocks[i][2] + aoCheck[faceIndex][canonical_indices[i]][1][2]) != 0;
-                            bool c = data.getBlock(corner_blocks[i][0] + aoCheck[faceIndex][canonical_indices[i]][2][0], corner_blocks[i][1] + aoCheck[faceIndex][canonical_indices[i]][2][1], corner_blocks[i][2] + aoCheck[faceIndex][canonical_indices[i]][2][2]) != 0;
-                            ao[i] = calculateAO(s1, s2, c);
-                        }
+                        float ao[4] = { 0,0,0,0 };
 
                         float quad_pos[3]; quad_pos[axis] = static_cast<float>(d); quad_pos[u_axis] = static_cast<float>(u); quad_pos[v_axis] = static_cast<float>(v);
                         float du[3] = { 0 }, dv[3] = { 0 }; du[u_axis] = static_cast<float>(width); dv[v_axis] = static_cast<float>(height);
@@ -305,7 +354,7 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                         }
 
                         auto push_vert = [&](int vert_idx, float ao_val, float u_tex, float v_tex) {
-                            mesh.vertices.insert(mesh.vertices.end(), { vert[vert_idx][0], vert[vert_idx][1], vert[vert_idx][2], u_tex, v_tex, ao_val, static_cast<float>(currentFace.light) });
+                            mesh.vertices.insert(mesh.vertices.end(), { vert[vert_idx][0], vert[vert_idx][1], vert[vert_idx][2], u_tex, v_tex, ao_val, lightLevel });
                             };
 
                         float u_width = TILE_WIDTH_NORMALIZED * width;
@@ -324,12 +373,7 @@ void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                             push_vert(1, ao[1], u_min + u_width, v_min);
                         }
 
-                        if (ao[0] + ao[2] > ao[1] + ao[3]) {
-                            mesh.indices.insert(mesh.indices.end(), { vertexCount + 0, vertexCount + 1, vertexCount + 3, vertexCount + 1, vertexCount + 2, vertexCount + 3 });
-                        }
-                        else {
-                            mesh.indices.insert(mesh.indices.end(), { vertexCount + 0, vertexCount + 1, vertexCount + 2, vertexCount + 2, vertexCount + 3, vertexCount + 0 });
-                        }
+                        mesh.indices.insert(mesh.indices.end(), { vertexCount + 0, vertexCount + 1, vertexCount + 2, vertexCount + 2, vertexCount + 3, vertexCount + 0 });
                         vertexCount += 4;
                     }
                 }

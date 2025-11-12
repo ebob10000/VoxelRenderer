@@ -220,7 +220,7 @@ void Application::update() {
     m_Player->update(m_DeltaTime, *m_World, m_Window);
     m_World->update(m_Player->getPosition());
 
-    glm::vec3 rayOrigin = m_Player->getRenderPosition();
+    glm::vec3 rayOrigin = m_Player->getCamera().position;
     glm::vec3 rayDir = m_Player->getCamera().front;
 
     m_HighlightedBlock = raycast(rayOrigin, rayDir, *m_World, 6.0f);
@@ -236,14 +236,13 @@ void Application::render() {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     m_WorldShader->use();
-    m_WorldShader->setBool("u_UseAO", m_World->m_UseAO);
     m_WorldShader->setBool("u_UseSunlight", m_World->m_UseSunlight);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
     glm::mat4 projection = glm::perspective(
-        glm::radians(m_Player->getFOV()),
+        glm::radians(m_Player->getCurrentFOV()),
         1280.0f / 720.0f,
         0.1f,
         1000.0f
@@ -332,7 +331,7 @@ void Application::renderDebugOverlay() {
         ImGui::Text("FPS: %.1f", fps);
         ImGui::Separator();
         ImGui::Text("Position: (%.1f, %.1f, %.1f)",
-            m_Player->getPosition().x, m_Player->getPosition().y, m_Player->getPosition().z);
+            m_Player->getPosition().x, m_Player->getCamera().position.y, m_Player->getPosition().z);
         if (m_HighlightedBlock.has_value()) {
             ImGui::Text("Target: (%d, %d, %d)", m_HighlightedBlock->blockPosition.x, m_HighlightedBlock->blockPosition.y, m_HighlightedBlock->blockPosition.z);
         }
@@ -344,7 +343,7 @@ void Application::renderDebugOverlay() {
         ImGui::Text("Sneaking: %s", m_Player->isSneaking() ? "Yes" : "No");
         ImGui::Text("Render Distance: %d", m_World->m_RenderDistance);
         ImGui::Text("Chunks Rendered: %d / %llu", m_RenderedChunks, m_World->getChunkCount());
-        ImGui::Text("Mesher: %s", m_World->m_UseGreedyMesher ? "Greedy" : "Simple");
+        ImGui::Text("Mesher: %s", (m_World->m_UseGreedyMesher && !m_World->m_SmoothLighting) ? "Greedy" : "Simple");
     }
     ImGui::End();
 }
@@ -359,17 +358,19 @@ void Application::renderImGui() {
             m_World->forceReload();
         }
 
-        if (ImGui::Checkbox("Use Greedy Meshing", &m_World->m_UseGreedyMesher)) {
-            m_World->forceReload();
-        }
-
-        if (ImGui::Checkbox("Ambient Occlusion", &m_World->m_UseAO)) {
-            m_World->forceReload();
-        }
-
         if (ImGui::Checkbox("Sunlight", &m_World->m_UseSunlight)) {
             m_World->forceReload();
         }
+
+        if (ImGui::Checkbox("Smooth Lighting", &m_World->m_SmoothLighting)) {
+            m_World->forceReload();
+        }
+
+        ImGui::BeginDisabled(m_World->m_SmoothLighting);
+        if (ImGui::Checkbox("Use Greedy Meshing", &m_World->m_UseGreedyMesher)) {
+            m_World->forceReload();
+        }
+        ImGui::EndDisabled();
 
         if (ImGui::SliderInt("Mipmap Level", &m_MipmapLevel, 0, 4)) {
             applyTextureSettings();
@@ -413,6 +414,13 @@ void Application::key_callback(GLFWwindow* window, int key, int scancode, int ac
     if (key == GLFW_KEY_G && action == GLFW_PRESS) {
         m_Player->setFlying(!m_Player->isFlying());
     }
+
+    if (key == GLFW_KEY_1 && action == GLFW_PRESS) {
+        m_HeldBlock = BlockID::Stone;
+    }
+    if (key == GLFW_KEY_2 && action == GLFW_PRESS) {
+        m_HeldBlock = BlockID::Glowstone;
+    }
 }
 
 void Application::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
@@ -454,7 +462,19 @@ void Application::mouse_button_callback(GLFWwindow* window, int button, int acti
         else if (button == GLFW_MOUSE_BUTTON_RIGHT) { // Place block
             const auto& result = m_HighlightedBlock.value();
             glm::ivec3 placePos = result.blockPosition + result.faceNormal;
-            m_World->setBlock(placePos.x, placePos.y, placePos.z, m_HeldBlock);
+
+            glm::vec3 blockMin(placePos);
+            glm::vec3 blockMax = blockMin + glm::vec3(1.0f);
+
+            auto playerAABB = m_Player->getAABB();
+
+            bool intersectX = playerAABB.first.x < blockMax.x && playerAABB.second.x > blockMin.x;
+            bool intersectY = playerAABB.first.y < blockMax.y && playerAABB.second.y > blockMin.y;
+            bool intersectZ = playerAABB.first.z < blockMax.z && playerAABB.second.z > blockMin.z;
+
+            if (!(intersectX && intersectY && intersectZ)) {
+                m_World->setBlock(placePos.x, placePos.y, placePos.z, m_HeldBlock);
+            }
         }
     }
 }
@@ -514,7 +534,7 @@ void Application::findSpawnPosition() {
         spawnY = static_cast<int>(((noiseValue + 1.0f) / 2.0f) * (CHUNK_HEIGHT - 10) + 5);
     }
 
-    glm::vec3 spawnPos(spawnX, spawnY + Physics::EYE_HEIGHT, spawnZ);
+    glm::vec3 spawnPos(spawnX, spawnY, spawnZ);
     m_Player = std::make_unique<Player>(spawnPos);
     std::cout << "Player spawned at: (" << spawnPos.x << ", " << spawnPos.y << ", " << spawnPos.z << ")" << std::endl;
 }
