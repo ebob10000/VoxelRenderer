@@ -1,9 +1,11 @@
 #pragma once
 #include "Camera.h"
 #include "World.h"
+#include "ItemStack.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <utility>
+#include <vector>
 
 namespace Physics {
     const float TICK_RATE = 20.0f;
@@ -55,6 +57,13 @@ public:
     float getCurrentFOV() const { return m_CurrentFOV; }
     std::pair<glm::vec3, glm::vec3> getAABB() const;
 
+    ItemStack& getSelectedItemStack();
+    int getSelectedSlot() const { return m_SelectedHotbarSlot; }
+    void setSelectedSlot(int slot);
+
+    std::vector<ItemStack> m_Inventory;
+    std::vector<ItemStack> m_Hotbar;
+
 private:
     void runPhysicsTick(World& world);
     void resolveCollisions(World& world);
@@ -79,4 +88,5 @@ private:
 
     float m_CurrentFOV;
     float m_CurrentEyeHeight;
+    int m_SelectedHotbarSlot = 0;
 };

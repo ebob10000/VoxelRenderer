@@ -11,6 +11,8 @@ Player::Player(const glm::vec3& spawnPosition)
     m_RenderPosition(spawnPosition),
     m_CurrentFOV(m_Camera.fov),
     m_CurrentEyeHeight(Physics::EYE_HEIGHT) {
+    m_Inventory.resize(27);
+    m_Hotbar.resize(9);
 }
 
 void Player::handleInput(GLFWwindow* window, bool isPaused) {
@@ -277,4 +279,14 @@ std::pair<glm::vec3, glm::vec3> Player::getAABB() const {
         m_Position + glm::vec3(-Physics::PLAYER_WIDTH / 2.0f, 0.0f, -Physics::PLAYER_WIDTH / 2.0f),
         m_Position + glm::vec3(Physics::PLAYER_WIDTH / 2.0f, currentHeight, Physics::PLAYER_WIDTH / 2.0f)
     );
+}
+
+ItemStack& Player::getSelectedItemStack() {
+    return m_Hotbar[m_SelectedHotbarSlot];
+}
+
+void Player::setSelectedSlot(int slot) {
+    if (slot >= 0 && slot < 9) {
+        m_SelectedHotbarSlot = slot;
+    }
 }

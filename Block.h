@@ -7,7 +7,8 @@ enum class BlockID : unsigned char {
     Stone = 1,
     Dirt = 2,
     Grass = 3,
-    Glowstone = 4
+    Glowstone = 4,
+    Bedrock = 5
 };
 
 struct BlockFace {
@@ -31,7 +32,7 @@ public:
     }
 
 private:
-    // Textures from left to right: Grass Top (0), Grass Side (1), Dirt (2), Stone (3), Glowstone (9)
+    // Textures: Grass Top(0), Grass Side(1), Dirt(2), Stone(3), Bedrock(4), Glowstone(9)
     static const inline std::map<BlockID, BlockData> m_BlockDataMap = {
         { BlockID::Stone, { BlockID::Stone, {
             { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }, { {3, 15} }
@@ -49,6 +50,9 @@ private:
         }}},
         { BlockID::Glowstone, { BlockID::Glowstone, {
             { {9, 15} }, { {9, 15} }, { {9, 15} }, { {9, 15} }, { {9, 15} }, { {9, 15} }
-        }, 15}}
+        }, 15}},
+        { BlockID::Bedrock, { BlockID::Bedrock, {
+            { {4, 15} }, { {4, 15} }, { {4, 15} }, { {4, 15} }, { {4, 15} }, { {4, 15} }
+        }}}
     };
 };

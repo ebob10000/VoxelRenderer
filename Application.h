@@ -4,8 +4,10 @@
 #include "Shader.h"
 #include "Frustum.h"
 #include "Ray.h"
+#include "ItemStack.h"
 #include <memory>
 #include <optional>
+#include <vector>
 
 struct GLFWwindow;
 
@@ -19,9 +21,14 @@ private:
     void processInput();
     void update();
     void render();
+
     void initImGui();
     void renderImGui();
+    void renderImGuiHotbar();
+    void renderImGuiInventory();
+    void renderImGuiHeldItem();
     void renderDebugOverlay();
+
     void initCrosshair();
     void renderCrosshair();
     void initOutline();
@@ -36,6 +43,7 @@ private:
     void window_focus_callback(GLFWwindow* window, int focused);
 
     GLFWwindow* m_Window;
+    int m_WindowWidth, m_WindowHeight;
     std::unique_ptr<Shader> m_WorldShader;
     std::unique_ptr<Shader> m_UiShader;
     std::unique_ptr<Shader> m_OutlineShader;
@@ -44,6 +52,7 @@ private:
     Frustum m_Frustum;
 
     bool m_IsPaused = false;
+    bool m_ShowInventory = false;
     bool m_WireframeMode = false;
     bool m_ShowDebugOverlay = true;
     int m_MipmapLevel = 4;
@@ -51,12 +60,14 @@ private:
     float m_LastFrame = 0.0f;
     int m_RenderedChunks = 0;
 
-    double m_LastMouseX = 1280.0 / 2.0;
-    double m_LastMouseY = 720.0 / 2.0;
+    double m_LastMouseX;
+    double m_LastMouseY;
     bool m_FirstMouse = true;
 
     std::optional<RaycastResult> m_HighlightedBlock;
-    BlockID m_HeldBlock = BlockID::Stone;
+
+    ItemStack m_HeldItemStack;
+    std::vector<BlockID> m_CreativeItems;
 
     unsigned int m_TextureID;
     unsigned int m_CrosshairVAO, m_CrosshairVBO;

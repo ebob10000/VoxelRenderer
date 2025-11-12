@@ -1,8 +1,14 @@
-﻿  Player.cpp
+﻿  Application.cpp
+C:\Users\ethan\Documents\Desktop\VoxelRenderer\Application.cpp(335,35): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+  Mesher.cpp
+  Player.cpp
+  Ray.cpp
+  World.cpp
+  main.cpp
   Generating code
-  2 of 3711 functions (<0.1%) were compiled, the rest were copied from previous compilation.
+  16 of 3859 functions ( 0.4%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    48 functions had inline decision re-evaluated but remain unchanged
+    64 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
   VoxelRenderer.vcxproj -> C:\Users\ethan\Documents\Desktop\VoxelRenderer\x64\Release\VoxelRenderer.exe
   'pwsh.exe' is not recognized as an internal or external command,

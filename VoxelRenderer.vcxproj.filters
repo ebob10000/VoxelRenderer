@@ -146,6 +146,9 @@
     <ClInclude Include="Ray.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ItemStack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\ui.frag">
@@ -164,6 +167,12 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="outline.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="inventory.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="inventory.frag">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

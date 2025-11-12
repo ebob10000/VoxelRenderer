@@ -1,7 +1,9 @@
 #pragma once
 #include "FastNoiseLite.h"
 #include "Chunk.h"
-#include "Block.h" // <<< Add this include
+#include "Block.h"
+#include <cstdlib>
+#include <ctime>
 
 class TerrainGenerator {
 public:
@@ -13,6 +15,8 @@ public:
         m_Noise.SetFractalOctaves(5);
         m_Noise.SetFractalLacunarity(2.0f);
         m_Noise.SetFractalGain(0.5f);
+
+        srand(seed);
     }
 
     void generateChunkData(Chunk& chunk) {
@@ -38,6 +42,25 @@ public:
                     }
                     else {
                         chunk.setBlock(x, y, z, (unsigned char)BlockID::Stone);
+                    }
+                }
+            }
+        }
+
+        for (int x = 0; x < CHUNK_WIDTH; ++x) {
+            for (int z = 0; z < CHUNK_DEPTH; ++z) {
+                for (int y = 0; y < 6; ++y) {
+                    int chance = -1;
+                    if (y == 0)      chance = 100;
+                    else if (y == 1) chance = 80;
+                    else if (y == 2) chance = 60;
+                    else if (y == 3) chance = 40;
+                    else if (y == 5) chance = 20;
+
+                    if (chance > 0) {
+                        if ((rand() % 100) < chance) {
+                            chunk.setBlock(x, y, z, (unsigned char)BlockID::Bedrock);
+                        }
                     }
                 }
             }
