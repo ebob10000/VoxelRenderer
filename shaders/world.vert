@@ -9,6 +9,7 @@ out vec2 TexCoords;
 out float AO;
 out float Light;
 out float FaceIndex;
+out vec3 FragPos;
 
 uniform mat4 view;
 uniform mat4 projection;
@@ -16,6 +17,7 @@ uniform mat4 projection;
 void main()
 {
     gl_Position = projection * view * vec4(aPos, 1.0);
+    FragPos = aPos;
     
     TexCoords = aTexCoords;
     AO = aAO;

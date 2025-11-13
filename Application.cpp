@@ -72,10 +72,10 @@ Application::Application() {
 
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load("textures/atlas.png", &width, &height, &nrChannels, 3);
+    unsigned char* data = stbi_load("textures/atlas.png", &width, &height, &nrChannels, 4);
 
     if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else {
@@ -89,7 +89,7 @@ Application::Application() {
 
     m_World = std::make_unique<World>();
 
-    glm::vec3 tempPos(8.5f, 100.0f, 8.5f);
+    glm::vec3 tempPos(8.5f, 130.0f, 8.5f);
     m_Player = std::make_unique<Player>(tempPos);
 
     m_CreativeItems.push_back(BlockID::Stone);
@@ -97,6 +97,8 @@ Application::Application() {
     m_CreativeItems.push_back(BlockID::Grass);
     m_CreativeItems.push_back(BlockID::Glowstone);
     m_CreativeItems.push_back(BlockID::Bedrock);
+    m_CreativeItems.push_back(BlockID::OakLog);
+    m_CreativeItems.push_back(BlockID::OakLeaves);
 
     m_World->update(tempPos);
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -232,13 +234,8 @@ void Application::update() {
 }
 
 void Application::render() {
-    glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
+    glClearColor(m_FogColor.r, m_FogColor.g, m_FogColor.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // --- 3D WORLD RENDERING ---
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glDisable(GL_BLEND);
 
     if (m_WireframeMode)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -247,6 +244,20 @@ void Application::render() {
 
     m_WorldShader->use();
     m_WorldShader->setBool("u_UseSunlight", m_World->m_UseSunlight);
+    m_WorldShader->setBool("u_UseAO", m_World->m_SmoothLighting);
+    m_WorldShader->setBool("u_UseFog", m_UseFog);
+    if (m_UseFog) {
+        float fogDensity = m_FogDensity;
+        if (m_AutoFogDensity) {
+            if (m_World->m_RenderDistance > 0) {
+                fogDensity = 0.12f / static_cast<float>(m_World->m_RenderDistance);
+            }
+        }
+        m_WorldShader->setVec3("u_FogColor", m_FogColor);
+        m_WorldShader->setFloat("u_FogDensity", fogDensity);
+        m_WorldShader->setFloat("u_FogGradient", m_FogGradient);
+        m_WorldShader->setVec3("u_CameraPos", m_Player->getCamera().position);
+    }
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_TextureID);
@@ -262,16 +273,29 @@ void Application::render() {
 
     m_WorldShader->setMat4("projection", projection);
     m_WorldShader->setMat4("view", view);
-    m_WorldShader->setMat4("model", glm::mat4(1.0f));
 
     m_Frustum.update(projection * view);
-    m_RenderedChunks = m_World->render(*m_WorldShader, m_Frustum);
+
+    // 1. Opaque Pass
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    m_RenderedChunks = m_World->renderOpaque(*m_WorldShader, m_Frustum);
+
+    // 2. Transparent Pass
+    glEnable(GL_BLEND);
+    if (m_LeafQuality == LeafQuality::Fancy) {
+        glDisable(GL_CULL_FACE);
+    }
+    m_World->renderTransparent(*m_WorldShader, m_Frustum);
+
+    // Reset state
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
 
     renderOutline(projection, view);
 
-    // --- 2D UI RENDERING ---
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    renderImGui(); // All UI is now handled by ImGui
+    renderImGui();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -503,8 +527,25 @@ void Application::renderDebugOverlay() {
     ImGui::End();
 }
 
+void Application::renderImGuiFogSettings() {
+    if (!m_ShowDebugOverlay) return;
+
+    ImGui::Begin("Fog Settings");
+    ImGui::Checkbox("Enable Fog", &m_UseFog);
+    if (m_UseFog) {
+        ImGui::ColorEdit3("Fog Color", &m_FogColor[0]);
+        ImGui::Checkbox("Auto Density", &m_AutoFogDensity);
+        ImGui::BeginDisabled(m_AutoFogDensity);
+        ImGui::SliderFloat("Density", &m_FogDensity, 0.0f, 0.1f, "%.4f");
+        ImGui::EndDisabled();
+        ImGui::SliderFloat("Gradient", &m_FogGradient, 0.1f, 5.0f);
+    }
+    ImGui::End();
+}
+
 void Application::renderImGui() {
     renderDebugOverlay();
+    renderImGuiFogSettings();
     renderCrosshair();
     renderImGuiHotbar();
     renderImGuiInventory();
@@ -539,6 +580,15 @@ void Application::renderImGui() {
             applyTextureSettings();
         }
 
+        const char* items[] = { "Fast", "Smart", "Fancy" };
+        int currentItem = static_cast<int>(m_LeafQuality);
+        if (ImGui::Combo("Leaf Quality", &currentItem, items, IM_ARRAYSIZE(items))) {
+            m_LeafQuality = static_cast<LeafQuality>(currentItem);
+            m_World->m_LeafQuality = m_LeafQuality;
+            m_World->forceReload();
+        }
+
+
         ImGui::Separator();
         bool isFlying = m_Player->isFlying();
         if (ImGui::Checkbox("Flying Mode", &isFlying)) {
@@ -552,7 +602,6 @@ void Application::renderImGui() {
         ImGui::End();
     }
 }
-
 void Application::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureKeyboard) return;
@@ -714,7 +763,7 @@ void Application::findSpawnPosition() {
     int spawnY = CHUNK_HEIGHT - 1;
     for (int y = CHUNK_HEIGHT - 1; y >= 0; --y) {
         if (m_World->getBlock((int)spawnX, y, (int)spawnZ) != 0) {
-            spawnY = y + 1;
+            spawnY = y + 2;
             break;
         }
     }
@@ -730,7 +779,7 @@ void Application::findSpawnPosition() {
         noise.SetFractalGain(0.5f);
 
         float noiseValue = noise.GetNoise(spawnX, spawnZ);
-        spawnY = static_cast<int>(((noiseValue + 1.0f) / 2.0f) * (CHUNK_HEIGHT - 10) + 5);
+        spawnY = 64 + static_cast<int>(((noiseValue + 1.0f) / 2.0f) * (CHUNK_HEIGHT - 70));
     }
 
     glm::vec3 spawnPos(spawnX, spawnY, spawnZ);

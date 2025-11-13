@@ -4,11 +4,18 @@
 
 Chunk::Chunk(int x, int y, int z) : m_Position(x, y, z) {
     m_Mesh = std::make_unique<Mesh>();
+    m_TransparentMesh = std::make_unique<Mesh>();
 }
 
-void Chunk::draw() {
+void Chunk::drawOpaque() {
     if (m_Mesh) {
         m_Mesh->draw();
+    }
+}
+
+void Chunk::drawTransparent() {
+    if (m_TransparentMesh) {
+        m_TransparentMesh->draw();
     }
 }
 

@@ -13,6 +13,7 @@
 #include "ThreadSafeQueue.h"
 #include "Mesher.h"
 #include "Block.h"
+#include "GraphicsSettings.h"
 
 struct ivec3_comp {
     bool operator()(const glm::ivec3& a, const glm::ivec3& b) const {
@@ -26,6 +27,8 @@ struct MeshData {
     glm::ivec3 chunkPosition;
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
+    std::vector<float> transparentVertices;
+    std::vector<unsigned int> transparentIndices;
 };
 
 struct LightUpdateNode {
@@ -50,11 +53,13 @@ public:
     bool m_UseGreedyMesher = false;
     bool m_UseSunlight = true;
     bool m_SmoothLighting = true;
+    std::atomic<LeafQuality> m_LeafQuality{ LeafQuality::Fancy };
 
     World();
     ~World();
     void update(const glm::vec3& playerPosition);
-    int render(Shader& shader, const Frustum& frustum);
+    int renderOpaque(Shader& shader, const Frustum& frustum);
+    void renderTransparent(Shader& shader, const Frustum& frustum);
     unsigned char getBlock(int x, int y, int z) const;
     void setBlock(int x, int y, int z, BlockID blockId);
     unsigned char getSunlight(int x, int y, int z) const;
@@ -73,7 +78,7 @@ private:
     void mesherLoop();
     void lightingLoop();
 
-    void calculateInitialSunlight(Chunk& chunk);
+    void propagateInitialLight(Chunk& chunk);
     void processLightUpdates(const LightUpdateJob& job);
 
     std::map<glm::ivec3, std::shared_ptr<Chunk>, ivec3_comp> m_Chunks;

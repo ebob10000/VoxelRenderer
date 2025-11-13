@@ -7,19 +7,21 @@
 struct Mesh;
 
 const int CHUNK_WIDTH = 16;
-const int CHUNK_HEIGHT = 64;
+const int CHUNK_HEIGHT = 128;
 const int CHUNK_DEPTH = 16;
 
 class Chunk {
 public:
     const glm::ivec3 m_Position;
     std::unique_ptr<Mesh> m_Mesh;
+    std::unique_ptr<Mesh> m_TransparentMesh;
     unsigned char blocks[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH] = { 0 };
     bool m_HasBeenMeshed = false;
 
     Chunk(int x, int y, int z);
 
-    void draw();
+    void drawOpaque();
+    void drawTransparent();
 
     unsigned char getBlock(int x, int y, int z) const;
     void setBlock(int x, int y, int z, unsigned char blockID);

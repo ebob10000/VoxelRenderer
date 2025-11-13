@@ -1,6 +1,7 @@
 #pragma once
 #include "Mesh.h"
 #include "Chunk.h"
+#include "GraphicsSettings.h"
 #include <array>
 #include <glm/glm.hpp>
 #include <memory>
@@ -19,23 +20,25 @@ public:
     unsigned char getBlock(int x, int y, int z) const;
     unsigned char getSunlight(int x, int y, int z) const;
     unsigned char getBlockLight(int x, int y, int z) const;
+    LeafQuality getLeafQuality() const { return m_LeafQuality; };
 
 private:
     unsigned char m_Blocks[PADDED_WIDTH][PADDED_HEIGHT][PADDED_DEPTH] = { 0 };
     unsigned char m_LightLevels[PADDED_WIDTH][PADDED_HEIGHT][PADDED_DEPTH] = { 0 };
+    LeafQuality m_LeafQuality;
 };
 
 class IMesher {
 public:
-    virtual void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) = 0;
+    virtual void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& opaqueMesh, Mesh& transparentMesh, bool smoothLighting) = 0;
 };
 
 class SimpleMesher : public IMesher {
 public:
-    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) override;
+    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& opaqueMesh, Mesh& transparentMesh, bool smoothLighting) override;
 };
 
 class GreedyMesher : public IMesher {
 public:
-    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) override;
+    void generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& opaqueMesh, Mesh& transparentMesh, bool smoothLighting) override;
 };

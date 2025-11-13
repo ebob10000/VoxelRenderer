@@ -1,15 +1,16 @@
 #pragma once
 #include "Player.h"
-#include "World.h"
 #include "Shader.h"
 #include "Frustum.h"
 #include "Ray.h"
 #include "ItemStack.h"
+#include "GraphicsSettings.h"
 #include <memory>
 #include <optional>
 #include <vector>
 
 struct GLFWwindow;
+class World;
 
 class Application {
 public:
@@ -27,6 +28,7 @@ private:
     void renderImGuiHotbar();
     void renderImGuiInventory();
     void renderImGuiHeldItem();
+    void renderImGuiFogSettings();
     void renderDebugOverlay();
 
     void initCrosshair();
@@ -72,4 +74,13 @@ private:
     unsigned int m_TextureID;
     unsigned int m_CrosshairVAO, m_CrosshairVBO;
     unsigned int m_OutlineVAO, m_OutlineVBO, m_OutlineEBO;
+
+    // Fog settings
+    bool m_UseFog = true;
+    glm::vec3 m_FogColor = glm::vec3(0.5f, 0.6f, 0.7f);
+    float m_FogDensity = 0.01f;
+    float m_FogGradient = 1.5f;
+    bool m_AutoFogDensity = true;
+
+    LeafQuality m_LeafQuality = LeafQuality::Fancy;
 };

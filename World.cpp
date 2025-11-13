@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <vector>
 
-World::World() : m_LastPlayerChunkPos(9999), m_IsRunning(true) {
+World::World() : m_LastPlayerChunkPos(9999, 0, 9999), m_IsRunning(true) {
     m_TerrainGenerator = std::make_unique<TerrainGenerator>(1337);
     m_SimpleMesher = std::make_unique<SimpleMesher>();
     m_GreedyMesher = std::make_unique<GreedyMesher>();
@@ -120,6 +120,9 @@ void World::processFinishedMeshes() {
             it->second->m_Mesh->vertices = std::move(finishedMesh.vertices);
             it->second->m_Mesh->indices = std::move(finishedMesh.indices);
             it->second->m_Mesh->upload();
+            it->second->m_TransparentMesh->vertices = std::move(finishedMesh.transparentVertices);
+            it->second->m_TransparentMesh->indices = std::move(finishedMesh.transparentIndices);
+            it->second->m_TransparentMesh->upload();
         }
 
         std::lock_guard<std::mutex> jobLock(m_MeshingJobsMutex);
@@ -140,13 +143,16 @@ void World::mesherLoop() {
             ? (IMesher*)m_GreedyMesher.get()
             : (IMesher*)m_SimpleMesher.get();
 
-        Mesh tempMesh;
-        mesher->generateMesh(dataProvider, jobPos, tempMesh, m_SmoothLighting);
+        Mesh tempOpaqueMesh;
+        Mesh tempTransparentMesh;
+        mesher->generateMesh(dataProvider, jobPos, tempOpaqueMesh, tempTransparentMesh, m_SmoothLighting);
 
         MeshData meshData;
         meshData.chunkPosition = jobPos;
-        meshData.vertices = std::move(tempMesh.vertices);
-        meshData.indices = std::move(tempMesh.indices);
+        meshData.vertices = std::move(tempOpaqueMesh.vertices);
+        meshData.indices = std::move(tempOpaqueMesh.indices);
+        meshData.transparentVertices = std::move(tempTransparentMesh.vertices);
+        meshData.transparentIndices = std::move(tempTransparentMesh.indices);
         m_FinishedMeshesQueue.push(std::move(meshData));
     }
 }
@@ -160,17 +166,23 @@ void World::lightingLoop() {
 
         glm::ivec3 initialPos;
         if (m_InitialLightQueue.try_pop(initialPos)) {
-            std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
-            auto it = m_Chunks.find(initialPos);
-            if (it != m_Chunks.end()) {
-                calculateInitialSunlight(*it->second);
+            std::shared_ptr<Chunk> chunk;
+            {
+                std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
+                auto it = m_Chunks.find(initialPos);
+                if (it != m_Chunks.end()) {
+                    chunk = it->second;
+                }
+            }
 
-                const glm::ivec3 offsets[] = { {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1}, {0,0,0} };
-                for (const auto& offset : offsets) {
-                    glm::ivec3 neighborPos = initialPos + offset;
-                    if (m_Chunks.count(neighborPos)) {
-                        std::lock_guard<std::mutex> dirtyLock(m_DirtyChunksMutex);
-                        m_DirtyChunks.insert(neighborPos);
+            if (chunk) {
+                propagateInitialLight(*chunk);
+
+                const glm::ivec3 offsets[] = { {0,0,0}, {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1} };
+                {
+                    std::lock_guard<std::mutex> dirtyLock(m_DirtyChunksMutex);
+                    for (const auto& offset : offsets) {
+                        m_DirtyChunks.insert(initialPos + offset);
                     }
                 }
             }
@@ -178,15 +190,70 @@ void World::lightingLoop() {
     }
 }
 
-void World::calculateInitialSunlight(Chunk& chunk) {
+void World::propagateInitialLight(Chunk& chunk) {
+    std::queue<LightUpdateNode> sunQueue;
+    std::queue<LightUpdateNode> blockQueue;
+
+    glm::ivec3 chunkWorldPos = chunk.m_Position * glm::ivec3(CHUNK_WIDTH, 0, CHUNK_DEPTH);
+
     for (int x = 0; x < CHUNK_WIDTH; ++x) {
         for (int z = 0; z < CHUNK_DEPTH; ++z) {
-            bool blocked = false;
+            bool skyVisible = true;
             for (int y = CHUNK_HEIGHT - 1; y >= 0; --y) {
-                if (chunk.getBlock(x, y, z) != 0) {
-                    blocked = true;
+                BlockID currentBlock = (BlockID)chunk.getBlock(x, y, z);
+                if (skyVisible) {
+                    if (BlockDataManager::isTransparentForLighting(currentBlock)) {
+                        chunk.setSunlight(x, y, z, 15);
+                        sunQueue.push({ chunkWorldPos + glm::ivec3(x, y, z), 15 });
+                    }
+                    else {
+                        chunk.setSunlight(x, y, z, 0);
+                        skyVisible = false;
+                    }
                 }
-                chunk.setSunlight(x, y, z, blocked ? 0 : 15);
+                else {
+                    chunk.setSunlight(x, y, z, 0);
+                }
+
+                const auto& blockData = BlockDataManager::getData(currentBlock);
+                if (blockData.emissionStrength > 0) {
+                    chunk.setBlockLight(x, y, z, blockData.emissionStrength);
+                    blockQueue.push({ chunkWorldPos + glm::ivec3(x, y, z), blockData.emissionStrength });
+                }
+                else {
+                    chunk.setBlockLight(x, y, z, 0);
+                }
+            }
+        }
+    }
+
+    while (!sunQueue.empty()) {
+        LightUpdateNode node = sunQueue.front();
+        sunQueue.pop();
+        if (node.level <= 1) continue;
+
+        for (const auto& offset : { glm::ivec3(0,-1,0), glm::ivec3(0,1,0), glm::ivec3(1,0,0), glm::ivec3(-1,0,0), glm::ivec3(0,0,1), glm::ivec3(0,0,-1) }) {
+            glm::ivec3 nPos = node.pos + offset;
+            bool isDownward = offset.y == -1;
+            unsigned char propagatedLight = (isDownward && node.level == 15) ? 15 : node.level - 1;
+
+            if (propagatedLight > 0 && BlockDataManager::isTransparentForLighting((BlockID)getBlock(nPos.x, nPos.y, nPos.z)) && getSunlight(nPos.x, nPos.y, nPos.z) < propagatedLight) {
+                setSunlight(nPos.x, nPos.y, nPos.z, propagatedLight);
+                sunQueue.push({ nPos, propagatedLight });
+            }
+        }
+    }
+
+    while (!blockQueue.empty()) {
+        LightUpdateNode node = blockQueue.front();
+        blockQueue.pop();
+        if (node.level <= 1) continue;
+
+        for (const auto& offset : { glm::ivec3(1,0,0), glm::ivec3(-1,0,0), glm::ivec3(0,1,0), glm::ivec3(0,-1,0), glm::ivec3(0,0,1), glm::ivec3(0,0,-1) }) {
+            glm::ivec3 nPos = node.pos + offset;
+            if (BlockDataManager::isTransparentForLighting((BlockID)getBlock(nPos.x, nPos.y, nPos.z)) && getBlockLight(nPos.x, nPos.y, nPos.z) < node.level - 1) {
+                setBlockLight(nPos.x, nPos.y, nPos.z, node.level - 1);
+                blockQueue.push({ nPos, (unsigned char)(node.level - 1) });
             }
         }
     }
@@ -197,7 +264,6 @@ void World::processLightUpdates(const LightUpdateJob& job) {
     const auto& oldData = BlockDataManager::getData(job.oldBlock);
     const auto& newData = BlockDataManager::getData(job.newBlock);
 
-    // --- Block Light ---
     {
         std::queue<LightUpdateNode> removalQueue;
         std::queue<LightUpdateNode> propagationQueue;
@@ -205,28 +271,23 @@ void World::processLightUpdates(const LightUpdateJob& job) {
         unsigned char lightAtPos = getBlockLight(job.pos.x, job.pos.y, job.pos.z);
         unsigned char emissionAtPos = oldData.emissionStrength;
 
-        // If the old block was a light source, its light must be removed.
         if (emissionAtPos > 0) {
             removalQueue.push({ job.pos, emissionAtPos });
-            // Clear the light at the source position only if the new block isn't also a light source.
             if (newData.emissionStrength == 0) {
                 setBlockLight(job.pos.x, job.pos.y, job.pos.z, 0);
             }
         }
-        // If an opaque block was placed where there was ambient light, that light is now blocked and must be removed.
-        else if (newData.id != BlockID::Air && lightAtPos > 0) {
+        else if (!BlockDataManager::isTransparentForLighting(newData.id) && lightAtPos > 0) {
             removalQueue.push({ job.pos, lightAtPos });
             setBlockLight(job.pos.x, job.pos.y, job.pos.z, 0);
         }
 
-        // If the new block is a light source, it needs to propagate its light.
         if (newData.emissionStrength > 0) {
             setBlockLight(job.pos.x, job.pos.y, job.pos.z, newData.emissionStrength);
             propagationQueue.push({ job.pos, newData.emissionStrength });
         }
 
-        // If a non-emitting block was removed, surrounding lights need to be propagated into the new space.
-        if (newData.id == BlockID::Air && oldData.id != BlockID::Air && oldData.emissionStrength == 0) {
+        if (BlockDataManager::isTransparentForLighting(newData.id) && !BlockDataManager::isTransparentForLighting(oldData.id) && oldData.emissionStrength == 0) {
             for (const auto& offset : { glm::ivec3(1,0,0), glm::ivec3(-1,0,0), glm::ivec3(0,1,0), glm::ivec3(0,-1,0), glm::ivec3(0,0,1), glm::ivec3(0,0,-1) }) {
                 glm::ivec3 nPos = job.pos + offset;
                 unsigned char light = getBlockLight(nPos.x, nPos.y, nPos.z);
@@ -236,7 +297,6 @@ void World::processLightUpdates(const LightUpdateJob& job) {
             }
         }
 
-        // Removal Pass
         while (!removalQueue.empty()) {
             LightUpdateNode node = removalQueue.front();
             removalQueue.pop();
@@ -257,7 +317,6 @@ void World::processLightUpdates(const LightUpdateJob& job) {
             }
         }
 
-        // Propagation Pass
         while (!propagationQueue.empty()) {
             LightUpdateNode node = propagationQueue.front();
             propagationQueue.pop();
@@ -266,7 +325,7 @@ void World::processLightUpdates(const LightUpdateJob& job) {
 
             for (const auto& offset : { glm::ivec3(1,0,0), glm::ivec3(-1,0,0), glm::ivec3(0,1,0), glm::ivec3(0,-1,0), glm::ivec3(0,0,1), glm::ivec3(0,0,-1) }) {
                 glm::ivec3 nPos = node.pos + offset;
-                if (getBlock(nPos.x, nPos.y, nPos.z) == 0 && getBlockLight(nPos.x, nPos.y, nPos.z) < node.level - 1) {
+                if (BlockDataManager::isTransparentForLighting((BlockID)getBlock(nPos.x, nPos.y, nPos.z)) && getBlockLight(nPos.x, nPos.y, nPos.z) < node.level - 1) {
                     setBlockLight(nPos.x, nPos.y, nPos.z, node.level - 1);
                     propagationQueue.push({ nPos, (unsigned char)(node.level - 1) });
                 }
@@ -274,16 +333,15 @@ void World::processLightUpdates(const LightUpdateJob& job) {
         }
     }
 
-    // --- Sunlight (identical logic structure) ---
     {
         std::queue<LightUpdateNode> sunRemovalQueue, sunPropagationQueue;
         unsigned char sunAtPos = getSunlight(job.pos.x, job.pos.y, job.pos.z);
 
-        if (newData.id != BlockID::Air && sunAtPos > 0) { // Placed an opaque block
+        if (!BlockDataManager::isTransparentForLighting(newData.id) && sunAtPos > 0) {
             setSunlight(job.pos.x, job.pos.y, job.pos.z, 0);
             sunRemovalQueue.push({ job.pos, sunAtPos });
         }
-        else if (newData.id == BlockID::Air) { // Removed a block
+        else if (BlockDataManager::isTransparentForLighting(newData.id)) {
             for (const auto& offset : { glm::ivec3(0,-1,0), glm::ivec3(0,1,0), glm::ivec3(1,0,0), glm::ivec3(-1,0,0), glm::ivec3(0,0,1), glm::ivec3(0,0,-1) }) {
                 glm::ivec3 nPos = job.pos + offset;
                 unsigned char light = getSunlight(nPos.x, nPos.y, nPos.z);
@@ -322,7 +380,7 @@ void World::processLightUpdates(const LightUpdateJob& job) {
                 bool isDownward = offset.y == -1;
                 unsigned char propagatedLight = (isDownward && node.level == 15) ? 15 : node.level - 1;
 
-                if (propagatedLight > 0 && getBlock(nPos.x, nPos.y, nPos.z) == 0 && getSunlight(nPos.x, nPos.y, nPos.z) < propagatedLight) {
+                if (propagatedLight > 0 && BlockDataManager::isTransparentForLighting((BlockID)getBlock(nPos.x, nPos.y, nPos.z)) && getSunlight(nPos.x, nPos.y, nPos.z) < propagatedLight) {
                     setSunlight(nPos.x, nPos.y, nPos.z, propagatedLight);
                     sunPropagationQueue.push({ nPos, propagatedLight });
                 }
@@ -340,7 +398,7 @@ void World::processLightUpdates(const LightUpdateJob& job) {
     }
 }
 
-int World::render(Shader& shader, const Frustum& frustum) {
+int World::renderOpaque(Shader& shader, const Frustum& frustum) {
     int chunksRendered = 0;
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
     for (auto const& [pos, chunk] : m_Chunks) {
@@ -348,21 +406,32 @@ int World::render(Shader& shader, const Frustum& frustum) {
         glm::vec3 max = min + glm::vec3(CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_DEPTH);
 
         if (frustum.isBoxInFrustum(min, max)) {
-            chunk->draw();
+            chunk->drawOpaque();
             chunksRendered++;
         }
     }
     return chunksRendered;
 }
 
+void World::renderTransparent(Shader& shader, const Frustum& frustum) {
+    std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
+    for (auto const& [pos, chunk] : m_Chunks) {
+        glm::vec3 min(pos.x * CHUNK_WIDTH, pos.y * CHUNK_HEIGHT, pos.z * CHUNK_DEPTH);
+        glm::vec3 max = min + glm::vec3(CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_DEPTH);
+
+        if (frustum.isBoxInFrustum(min, max)) {
+            chunk->drawTransparent();
+        }
+    }
+}
+
 unsigned char World::getBlock(int x, int y, int z) const {
     if (y < 0 || y >= CHUNK_HEIGHT) return 0;
     int chunkX = static_cast<int>(floor((float)x / CHUNK_WIDTH));
-    int chunkY = static_cast<int>(floor((float)y / CHUNK_HEIGHT));
     int chunkZ = static_cast<int>(floor((float)z / CHUNK_DEPTH));
 
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
-    auto it = m_Chunks.find({ chunkX, chunkY, chunkZ });
+    auto it = m_Chunks.find({ chunkX, 0, chunkZ });
 
     if (it != m_Chunks.end()) {
         int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
@@ -413,11 +482,10 @@ void World::setBlock(int x, int y, int z, BlockID blockId) {
 unsigned char World::getSunlight(int x, int y, int z) const {
     if (y < 0 || y >= CHUNK_HEIGHT) return 15;
     int chunkX = static_cast<int>(floor((float)x / CHUNK_WIDTH));
-    int chunkY = static_cast<int>(floor((float)y / CHUNK_HEIGHT));
     int chunkZ = static_cast<int>(floor((float)z / CHUNK_DEPTH));
 
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
-    auto it = m_Chunks.find({ chunkX, chunkY, chunkZ });
+    auto it = m_Chunks.find({ chunkX, 0, chunkZ });
 
     if (it != m_Chunks.end()) {
         int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
@@ -431,11 +499,10 @@ unsigned char World::getSunlight(int x, int y, int z) const {
 void World::setSunlight(int x, int y, int z, unsigned char level) {
     if (y < 0 || y >= CHUNK_HEIGHT) return;
     int chunkX = static_cast<int>(floor((float)x / CHUNK_WIDTH));
-    int chunkY = static_cast<int>(floor((float)y / CHUNK_HEIGHT));
     int chunkZ = static_cast<int>(floor((float)z / CHUNK_DEPTH));
 
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
-    auto it = m_Chunks.find({ chunkX, chunkY, chunkZ });
+    auto it = m_Chunks.find({ chunkX, 0, chunkZ });
 
     if (it != m_Chunks.end()) {
         int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
@@ -448,11 +515,10 @@ void World::setSunlight(int x, int y, int z, unsigned char level) {
 unsigned char World::getBlockLight(int x, int y, int z) const {
     if (y < 0 || y >= CHUNK_HEIGHT) return 0;
     int chunkX = static_cast<int>(floor((float)x / CHUNK_WIDTH));
-    int chunkY = static_cast<int>(floor((float)y / CHUNK_HEIGHT));
     int chunkZ = static_cast<int>(floor((float)z / CHUNK_DEPTH));
 
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
-    auto it = m_Chunks.find({ chunkX, chunkY, chunkZ });
+    auto it = m_Chunks.find({ chunkX, 0, chunkZ });
 
     if (it != m_Chunks.end()) {
         int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
@@ -466,11 +532,10 @@ unsigned char World::getBlockLight(int x, int y, int z) const {
 void World::setBlockLight(int x, int y, int z, unsigned char level) {
     if (y < 0 || y >= CHUNK_HEIGHT) return;
     int chunkX = static_cast<int>(floor((float)x / CHUNK_WIDTH));
-    int chunkY = static_cast<int>(floor((float)y / CHUNK_HEIGHT));
     int chunkZ = static_cast<int>(floor((float)z / CHUNK_DEPTH));
 
     std::shared_lock<std::shared_mutex> lock(m_ChunksMutex);
-    auto it = m_Chunks.find({ chunkX, chunkY, chunkZ });
+    auto it = m_Chunks.find({ chunkX, 0, chunkZ });
 
     if (it != m_Chunks.end()) {
         int localX = (x % CHUNK_WIDTH + CHUNK_WIDTH) % CHUNK_WIDTH;
@@ -491,5 +556,5 @@ void World::forceReload() {
         std::unique_lock<std::shared_mutex> lock(m_ChunksMutex);
         m_Chunks.clear();
     }
-    m_LastPlayerChunkPos = glm::ivec3(9999);
+    m_LastPlayerChunkPos = glm::ivec3(9999, 0, 9999);
 }

@@ -13,6 +13,7 @@ const float TILE_WIDTH_NORMALIZED = 1.0f / ATLAS_WIDTH_TILES;
 const float TILE_HEIGHT_NORMALIZED = 1.0f / ATLAS_HEIGHT_TILES;
 
 ChunkMeshingData::ChunkMeshingData(World& world, const glm::ivec3& centralChunkPos) {
+    m_LeafQuality = world.m_LeafQuality.load();
     std::array<std::shared_ptr<const Chunk>, 9> neighbors{};
     {
         std::shared_lock<std::shared_mutex> lock(world.m_ChunksMutex);
@@ -125,19 +126,19 @@ namespace {
     }
 }
 
-void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) {
-    mesh.vertices.clear();
-    mesh.indices.clear();
-    unsigned int vertexCount = 0;
-
-    mesh.vertices.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH * 2 * 4 * 7);
-    mesh.indices.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH * 2 * 6);
+void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& opaqueMesh, Mesh& transparentMesh, bool smoothLighting) {
+    opaqueMesh.vertices.clear();
+    opaqueMesh.indices.clear();
+    transparentMesh.vertices.clear();
+    transparentMesh.indices.clear();
+    unsigned int opaqueVertexCount = 0;
+    unsigned int transparentVertexCount = 0;
 
     float chunkWorldX = static_cast<float>(chunkPosition.x * CHUNK_WIDTH);
     float chunkWorldY = static_cast<float>(chunkPosition.y * CHUNK_HEIGHT);
     float chunkWorldZ = static_cast<float>(chunkPosition.z * CHUNK_DEPTH);
 
-    auto addFace = [&](int x, int y, int z, int faceIndex) {
+    auto addFace = [&](int x, int y, int z, int faceIndex, Mesh& mesh, unsigned int& vertexCount) {
         BlockID blockID = (BlockID)data.getBlock(x, y, z);
         const BlockData& blockData = BlockDataManager::getData(blockID);
         glm::ivec2 texCoords = blockData.faces[faceIndex].tex_coords;
@@ -168,9 +169,9 @@ void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                 });
 
             if (smoothLighting) {
-                bool s1 = data.getBlock(x + aoCheck[faceIndex][i][0][0], y + aoCheck[faceIndex][i][0][1], z + aoCheck[faceIndex][i][0][2]) != 0;
-                bool s2 = data.getBlock(x + aoCheck[faceIndex][i][1][0], y + aoCheck[faceIndex][i][1][1], z + aoCheck[faceIndex][i][1][2]) != 0;
-                bool c = data.getBlock(x + aoCheck[faceIndex][i][2][0], y + aoCheck[faceIndex][i][2][1], z + aoCheck[faceIndex][i][2][2]) != 0;
+                bool s1 = !BlockDataManager::isTransparentForLighting((BlockID)data.getBlock(x + aoCheck[faceIndex][i][0][0], y + aoCheck[faceIndex][i][0][1], z + aoCheck[faceIndex][i][0][2]));
+                bool s2 = !BlockDataManager::isTransparentForLighting((BlockID)data.getBlock(x + aoCheck[faceIndex][i][1][0], y + aoCheck[faceIndex][i][1][1], z + aoCheck[faceIndex][i][1][2]));
+                bool c = !BlockDataManager::isTransparentForLighting((BlockID)data.getBlock(x + aoCheck[faceIndex][i][2][0], y + aoCheck[faceIndex][i][2][1], z + aoCheck[faceIndex][i][2][2]));
                 ao[i] = calculateAO(s1, s2, c);
             }
             else {
@@ -211,6 +212,7 @@ void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
                 }
                 mesh.vertices.push_back(lightLevel);
             }
+            mesh.vertices.push_back(static_cast<float>(faceIndex));
         }
 
         if (smoothLighting && (ao[0] + ao[2] > ao[1] + ao[3])) {
@@ -222,162 +224,50 @@ void SimpleMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& 
         vertexCount += 4;
         };
 
+    LeafQuality quality = data.getLeafQuality();
+
     for (int y = 0; y < CHUNK_HEIGHT; y++) {
         for (int x = 0; x < CHUNK_WIDTH; x++) {
             for (int z = 0; z < CHUNK_DEPTH; z++) {
                 BlockID currentBlock = (BlockID)data.getBlock(x, y, z);
                 if (currentBlock == BlockID::Air) continue;
 
-                if ((BlockID)data.getBlock(x + 1, y, z) == BlockID::Air) addFace(x, y, z, 1);
-                if ((BlockID)data.getBlock(x - 1, y, z) == BlockID::Air) addFace(x, y, z, 0);
-                if ((BlockID)data.getBlock(x, y + 1, z) == BlockID::Air) addFace(x, y, z, 3);
-                if ((BlockID)data.getBlock(x, y - 1, z) == BlockID::Air) addFace(x, y, z, 2);
-                if ((BlockID)data.getBlock(x, y, z + 1) == BlockID::Air) addFace(x, y, z, 5);
-                if ((BlockID)data.getBlock(x, y, z - 1) == BlockID::Air) addFace(x, y, z, 4);
-            }
-        }
-    }
-}
+                auto checkFace = [&](int nx, int ny, int nz, int faceIndex) {
+                    BlockID neighborBlock = (BlockID)data.getBlock(nx, ny, nz);
+                    bool shouldDraw = false;
 
-namespace {
-    struct FaceInfo {
-        bool visible = false;
-        unsigned char sunLight = 0;
-        unsigned char blockLight = 0;
-        BlockID blockID = BlockID::Air;
-
-        bool operator==(const FaceInfo& other) const {
-            return visible == other.visible && sunLight == other.sunLight && blockLight == other.blockLight && blockID == other.blockID;
-        }
-    };
-}
-
-void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& mesh, bool smoothLighting) {
-    mesh.vertices.clear();
-    mesh.indices.clear();
-    unsigned int vertexCount = 0;
-
-    mesh.vertices.reserve(4096 * 7);
-    mesh.indices.reserve(2048 * 6);
-
-    float chunkWorldX = static_cast<float>(chunkPosition.x * CHUNK_WIDTH);
-    float chunkWorldY = static_cast<float>(chunkPosition.y * CHUNK_HEIGHT);
-    float chunkWorldZ = static_cast<float>(chunkPosition.z * CHUNK_DEPTH);
-
-    int dims[] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_DEPTH };
-
-    for (int axis = 0; axis < 3; ++axis) {
-        for (int dir = 0; dir < 2; ++dir) {
-            bool positive = (dir == 1);
-            int faceIndex = axis * 2 + dir;
-
-            int u_axis = (axis + 1) % 3;
-            int v_axis = (axis + 2) % 3;
-
-            int D = dims[axis];
-            int U = dims[u_axis];
-            int V = dims[v_axis];
-
-            for (int d = 0; d < D; ++d) {
-                std::vector<FaceInfo> sliceData(U * V);
-
-                for (int u = 0; u < U; ++u) {
-                    for (int v = 0; v < V; ++v) {
-                        int pos[3];
-                        pos[axis] = d; pos[u_axis] = u; pos[v_axis] = v;
-
-                        int normal[3] = { 0 }; normal[axis] = positive ? 1 : -1;
-                        int nx = pos[0] + normal[0];
-                        int ny = pos[1] + normal[1];
-                        int nz = pos[2] + normal[2];
-
-                        BlockID currentBlock = (BlockID)data.getBlock(pos[0], pos[1], pos[2]);
-                        BlockID neighborBlock = (BlockID)data.getBlock(nx, ny, nz);
-
-                        if (currentBlock != BlockID::Air && neighborBlock == BlockID::Air) {
-                            FaceInfo& info = sliceData[u + v * U];
-                            info.visible = true;
-                            info.blockID = currentBlock;
-                            info.sunLight = data.getSunlight(nx, ny, nz);
-                            info.blockLight = data.getBlockLight(nx, ny, nz);
+                    if (currentBlock == BlockID::OakLeaves && neighborBlock == BlockID::OakLeaves && quality == LeafQuality::Fancy) {
+                        if (faceIndex == 1 || faceIndex == 3 || faceIndex == 5) { // Positive faces
+                            shouldDraw = true;
                         }
                     }
-                }
+                    else {
+                        shouldDraw = BlockDataManager::shouldRenderFace(currentBlock, neighborBlock, quality);
+                    }
 
-                for (int v = 0; v < V; ++v) {
-                    for (int u = 0; u < U; ++u) {
-                        if (!sliceData[u + v * U].visible) continue;
-
-                        FaceInfo currentFace = sliceData[u + v * U];
-                        float lightLevel = std::max((float)currentFace.sunLight, (float)currentFace.blockLight);
-
-                        int width = 1;
-                        while (u + width < U && sliceData[u + width + v * U] == currentFace) {
-                            width++;
-                        }
-
-                        int height = 1;
-                        bool done = false;
-                        for (int h = 1; v + h < V; ++h) {
-                            for (int w = 0; w < width; ++w) {
-                                if (!(sliceData[u + w + (v + h) * U] == currentFace)) { done = true; break; }
-                            }
-                            if (!done) height++; else break;
-                        }
-
-                        for (int h = 0; h < height; ++h) {
-                            for (int w = 0; w < width; ++w) {
-                                sliceData[u + w + (v + h) * U].visible = false;
-                            }
-                        }
-
-                        const BlockData& blockData = BlockDataManager::getData(currentFace.blockID);
-                        if (blockData.emissionStrength > 0) {
-                            lightLevel = static_cast<float>(blockData.emissionStrength);
-                        }
-                        glm::ivec2 texCoords = blockData.faces[faceIndex].tex_coords;
-
-                        float u_min = texCoords.x * TILE_WIDTH_NORMALIZED;
-                        float v_min = texCoords.y * TILE_HEIGHT_NORMALIZED;
-
-                        float ao[4] = { 0,0,0,0 };
-
-                        float quad_pos[3]; quad_pos[axis] = static_cast<float>(d); quad_pos[u_axis] = static_cast<float>(u); quad_pos[v_axis] = static_cast<float>(v);
-                        float du[3] = { 0 }, dv[3] = { 0 }; du[u_axis] = static_cast<float>(width); dv[v_axis] = static_cast<float>(height);
-
-                        float offset = positive ? 0.5f : -0.5f;
-                        float vert[4][3];
-                        for (int i = 0; i < 3; ++i) {
-                            float base = ((i == axis) ? (quad_pos[i] + offset) : (quad_pos[i] - 0.5f)) + 0.5f;
-                            if (i == 0) base += chunkWorldX; else if (i == 1) base += chunkWorldY; else base += chunkWorldZ;
-                            vert[0][i] = base; vert[1][i] = base + du[i]; vert[2][i] = base + du[i] + dv[i]; vert[3][i] = base + dv[i];
-                        }
-
-                        auto push_vert = [&](int vert_idx, float ao_val, float u_tex, float v_tex) {
-                            mesh.vertices.insert(mesh.vertices.end(), { vert[vert_idx][0], vert[vert_idx][1], vert[vert_idx][2], u_tex, v_tex, ao_val, lightLevel });
-                            };
-
-                        float u_width = TILE_WIDTH_NORMALIZED * width;
-                        float v_height = TILE_HEIGHT_NORMALIZED * height;
-
-                        if (positive) {
-                            push_vert(0, ao[0], u_min, v_min);
-                            push_vert(1, ao[1], u_min + u_width, v_min);
-                            push_vert(2, ao[2], u_min + u_width, v_min + v_height);
-                            push_vert(3, ao[3], u_min, v_min + v_height);
+                    if (shouldDraw) {
+                        bool isTransparentPass = (currentBlock == BlockID::OakLeaves && quality != LeafQuality::Fast);
+                        if (isTransparentPass) {
+                            addFace(x, y, z, faceIndex, transparentMesh, transparentVertexCount);
                         }
                         else {
-                            push_vert(0, ao[0], u_min, v_min);
-                            push_vert(3, ao[3], u_min, v_min + v_height);
-                            push_vert(2, ao[2], u_min + u_width, v_min + v_height);
-                            push_vert(1, ao[1], u_min + u_width, v_min);
+                            addFace(x, y, z, faceIndex, opaqueMesh, opaqueVertexCount);
                         }
-
-                        mesh.indices.insert(mesh.indices.end(), { vertexCount + 0, vertexCount + 1, vertexCount + 2, vertexCount + 2, vertexCount + 3, vertexCount + 0 });
-                        vertexCount += 4;
                     }
-                }
+                    };
+
+                checkFace(x + 1, y, z, 1);
+                checkFace(x - 1, y, z, 0);
+                checkFace(x, y + 1, z, 3);
+                checkFace(x, y - 1, z, 2);
+                checkFace(x, y, z + 1, 5);
+                checkFace(x, y, z - 1, 4);
             }
         }
     }
+}
+
+void GreedyMesher::generateMesh(const ChunkMeshingData& data, const glm::ivec3& chunkPosition, Mesh& opaqueMesh, Mesh& transparentMesh, bool smoothLighting) {
+    SimpleMesher simple;
+    simple.generateMesh(data, chunkPosition, opaqueMesh, transparentMesh, smoothLighting);
 }

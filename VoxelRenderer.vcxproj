@@ -161,6 +161,7 @@
     <ClInclude Include="FaceData.h" />
     <ClInclude Include="FastNoiseLite.h" />
     <ClInclude Include="Frustum.h" />
+    <ClInclude Include="GraphicsSettings.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_glfw.h" />
